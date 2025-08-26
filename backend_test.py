@@ -249,7 +249,7 @@ class SkyRideAPITester:
 
         # Test 3: Create Quote (using first listing)
         first_listing = listings[0]
-        quote = self.test_create_quote(first_listing['id'])
+        quote = self.test_create_quote(first_listing['_id'])
         if not quote:
             print("\n❌ Quote creation failed - stopping tests")
             return False
