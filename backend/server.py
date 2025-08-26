@@ -571,8 +571,30 @@ async def create_hold(hold_data: HoldCreate):
 @api_router.post("/checkout", response_model=Dict[str, Any])
 async def create_checkout(checkout_data: CheckoutCreate):
     """Create checkout for booking"""
-    # Get booking (assuming orderId is bookingId for MVP)
+    # First try to find booking by orderId
     booking = await db.bookings.find_one({"_id": checkout_data.orderId})
+    
+    if not booking:
+        # If not found, try to find by quote ID and create booking
+        quote = await db.quotes.find_one({"_id": checkout_data.orderId})
+        if quote:
+            # Create booking from quote for MVP
+            booking_data = {
+                "_id": quote["_id"],  # Use quote ID as booking ID for MVP
+                "quoteId": quote["_id"],
+                "operatorId": "op_panama_elite",  # Default for MVP
+                "totalAmount": quote["totalPrice"],
+                "departureDate": quote["departureDate"],
+                "returnDate": quote.get("returnDate"),
+                "status": "PENDING",
+                "bookingNumber": f"SR{datetime.now().strftime('%Y%m%d')}{quote['token'][:8].upper()}",
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "updatedAt": datetime.now(timezone.utc).isoformat()
+            }
+            
+            await db.bookings.insert_one(booking_data)
+            booking = booking_data
+    
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
