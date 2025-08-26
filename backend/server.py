@@ -295,6 +295,10 @@ def parse_from_mongo(item):
             # Parse lists of dictionaries
             elif isinstance(value, list):
                 item[key] = [parse_from_mongo(v) if isinstance(v, dict) else v for v in value]
+        
+        # Add 'id' field for frontend compatibility
+        if '_id' in item and 'id' not in item:
+            item['id'] = item['_id']
     return item
 
 async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional[str]:
