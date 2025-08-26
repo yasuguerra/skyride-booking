@@ -541,7 +541,7 @@ async def create_hold(hold_data: HoldCreate):
     
     # Create hold
     hold = Hold(
-        quoteId=quote["_id"],
+        quoteId=str(quote["_id"]),
         depositAmount=hold_data.depositAmount,
         expiresAt=datetime.now(timezone.utc) + timedelta(hours=24)  # 24h hold
     )
