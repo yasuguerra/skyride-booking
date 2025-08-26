@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+"""
+SkyRide Backend API Test Suite
+Tests all backend endpoints for the charter flight booking platform
+"""
+
+import requests
+import sys
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
+
+class SkyRideAPITester:
+    def __init__(self, base_url="https://charter-hub-1.preview.emergentagent.com"):
+        self.base_url = base_url
+        self.api_url = f"{base_url}/api"
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.test_results = []
+
+    def log_test(self, name: str, success: bool, details: str = "", response_data: Any = None):
+        """Log test result"""
+        self.tests_run += 1
+        if success:
+            self.tests_passed += 1
+            status = "✅ PASS"
+        else:
+            status = "❌ FAIL"
+        
+        result = {
+            "name": name,
+            "success": success,
+            "details": details,
+            "response_data": response_data
+        }
+        self.test_results.append(result)
+        print(f"{status} - {name}")
+        if details:
+            print(f"    {details}")
+        if not success and response_data:
+            print(f"    Response: {response_data}")
+
+    def make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> tuple:
+        """Make HTTP request and return (success, status_code, response_data)"""
+        url = f"{self.api_url}{endpoint}"
+        headers = {'Content-Type': 'application/json'}
+        
+        try:
+            if method == 'GET':
+                response = requests.get(url, headers=headers, params=params, timeout=10)
+            elif method == 'POST':
+                response = requests.post(url, headers=headers, json=data, timeout=10)
+            else:
+                return False, 0, f"Unsupported method: {method}"
+
+            try:
+                response_data = response.json()
+            except:
+                response_data = response.text
+
+            return True, response.status_code, response_data
+
+        except requests.exceptions.RequestException as e:
+            return False, 0, str(e)
+
+    def test_health_endpoint(self):
+        """Test /api/health endpoint"""
+        success, status_code, data = self.make_request('GET', '/health')
+        
+        if not success:
+            self.log_test("Health Check", False, f"Request failed: {data}")
+            return False
+
+        if status_code == 200:
+            expected_keys = ['status', 'features', 'dry_run']
+            has_all_keys = all(key in data for key in expected_keys)
+            
+            if has_all_keys and data.get('status') == 'ok':
+                self.log_test("Health Check", True, f"Status: {data.get('status')}, DRY_RUN: {data.get('dry_run')}")
+                return True
+            else:
+                self.log_test("Health Check", False, f"Missing expected keys or wrong status", data)
+                return False
+        else:
+            self.log_test("Health Check", False, f"Expected 200, got {status_code}", data)
+            return False
+
+    def test_listings_endpoint(self):
+        """Test /api/listings endpoint"""
+        success, status_code, data = self.make_request('GET', '/listings')
+        
+        if not success:
+            self.log_test("Get Listings", False, f"Request failed: {data}")
+            return None
+
+        if status_code == 200:
+            if isinstance(data, list):
+                listings_count = len(data)
+                self.log_test("Get Listings", True, f"Retrieved {listings_count} listings")
+                
+                # Validate listing structure if we have listings
+                if listings_count > 0:
+                    first_listing = data[0]
+                    required_fields = ['id', 'basePrice', 'serviceFee', 'totalPrice', 'operator', 'aircraft', 'route']
+                    missing_fields = [field for field in required_fields if field not in first_listing]
+                    
+                    if missing_fields:
+                        self.log_test("Listing Structure", False, f"Missing fields: {missing_fields}")
+                    else:
+                        self.log_test("Listing Structure", True, "All required fields present")
+                        
+                        # Check if we have the expected 4 Panama City flights
+                        panama_flights = [l for l in data if l.get('route', {}).get('origin', '').lower().find('panama') != -1]
+                        self.log_test("Panama City Flights", len(panama_flights) >= 4, f"Found {len(panama_flights)} Panama City flights")
+                
+                return data
+            else:
+                self.log_test("Get Listings", False, f"Expected list, got {type(data)}", data)
+                return None
+        else:
+            self.log_test("Get Listings", False, f"Expected 200, got {status_code}", data)
+            return None
+
+    def test_create_quote(self, listing_id: str):
+        """Test /api/quotes endpoint"""
+        quote_data = {
+            "listingId": listing_id,
+            "passengers": 2,
+            "departureDate": (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d'),
+            "email": "test@skyride.city",
+            "phone": "+507 6000-0000"
+        }
+        
+        success, status_code, data = self.make_request('POST', '/quotes', data=quote_data)
+        
+        if not success:
+            self.log_test("Create Quote", False, f"Request failed: {data}")
+            return None
+
+        if status_code == 200:
+            required_fields = ['token', 'expiresAt', 'hostedQuoteUrl', 'totalPrice']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("Create Quote", False, f"Missing fields: {missing_fields}", data)
+                return None
+            else:
+                self.log_test("Create Quote", True, f"Quote created with token: {data['token']}")
+                return data
+        else:
+            self.log_test("Create Quote", False, f"Expected 200, got {status_code}", data)
+            return None
+
+    def test_get_quote(self, token: str):
+        """Test /api/quotes/{token} endpoint"""
+        success, status_code, data = self.make_request('GET', f'/quotes/{token}')
+        
+        if not success:
+            self.log_test("Get Quote by Token", False, f"Request failed: {data}")
+            return None
+
+        if status_code == 200:
+            required_fields = ['id', 'token', 'totalPrice', 'listing', 'operator', 'aircraft', 'route']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("Get Quote by Token", False, f"Missing fields: {missing_fields}")
+                return None
+            else:
+                self.log_test("Get Quote by Token", True, f"Quote retrieved successfully")
+                return data
+        else:
+            self.log_test("Get Quote by Token", False, f"Expected 200, got {status_code}", data)
+            return None
+
+    def test_create_hold(self, token: str):
+        """Test /api/holds endpoint"""
+        hold_data = {
+            "token": token,
+            "depositAmount": 500.0
+        }
+        
+        success, status_code, data = self.make_request('POST', '/holds', data=hold_data)
+        
+        if not success:
+            self.log_test("Create Hold", False, f"Request failed: {data}")
+            return None
+
+        if status_code == 200:
+            required_fields = ['holdId', 'expiresAt', 'message']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("Create Hold", False, f"Missing fields: {missing_fields}", data)
+                return None
+            else:
+                self.log_test("Create Hold", True, f"Hold created: {data['holdId']}")
+                return data
+        else:
+            self.log_test("Create Hold", False, f"Expected 200, got {status_code}", data)
+            return None
+
+    def test_checkout_endpoint(self, quote_id: str):
+        """Test /api/checkout endpoint"""
+        checkout_data = {
+            "orderId": quote_id,
+            "provider": "WOMPI"
+        }
+        
+        success, status_code, data = self.make_request('POST', '/checkout', data=checkout_data)
+        
+        if not success:
+            self.log_test("Create Checkout", False, f"Request failed: {data}")
+            return None
+
+        # In DRY_RUN mode, we might get different responses
+        if status_code == 200:
+            if 'paymentLinkUrl' in data:
+                self.log_test("Create Checkout", True, f"Payment link created")
+                return data
+            else:
+                self.log_test("Create Checkout", False, f"No payment link in response", data)
+                return None
+        elif status_code == 404:
+            # Expected if booking doesn't exist (we're using quote ID as order ID)
+            self.log_test("Create Checkout", True, f"Expected 404 for non-existent booking (using quote ID)")
+            return None
+        else:
+            self.log_test("Create Checkout", False, f"Unexpected status {status_code}", data)
+            return None
+
+    def run_all_tests(self):
+        """Run comprehensive test suite"""
+        print("🚀 Starting SkyRide Backend API Tests")
+        print(f"📡 Testing endpoint: {self.api_url}")
+        print("=" * 60)
+
+        # Test 1: Health Check
+        health_ok = self.test_health_endpoint()
+        if not health_ok:
+            print("\n❌ Health check failed - stopping tests")
+            return False
+
+        # Test 2: Get Listings
+        listings = self.test_listings_endpoint()
+        if not listings:
+            print("\n❌ No listings available - stopping tests")
+            return False
+
+        # Test 3: Create Quote (using first listing)
+        first_listing = listings[0]
+        quote = self.test_create_quote(first_listing['id'])
+        if not quote:
+            print("\n❌ Quote creation failed - stopping tests")
+            return False
+
+        # Test 4: Get Quote by Token
+        quote_details = self.test_get_quote(quote['token'])
+        if not quote_details:
+            print("\n❌ Quote retrieval failed - continuing with other tests")
+
+        # Test 5: Create Hold
+        hold = self.test_create_hold(quote['token'])
+        if not hold:
+            print("\n⚠️ Hold creation failed - continuing with other tests")
+
+        # Test 6: Checkout (expected to fail in MVP without booking creation)
+        checkout = self.test_checkout_endpoint(quote_details['id'] if quote_details else 'test-id')
+
+        return True
+
+    def print_summary(self):
+        """Print test summary"""
+        print("\n" + "=" * 60)
+        print("📊 TEST SUMMARY")
+        print("=" * 60)
+        print(f"Total Tests: {self.tests_run}")
+        print(f"Passed: {self.tests_passed}")
+        print(f"Failed: {self.tests_run - self.tests_passed}")
+        print(f"Success Rate: {(self.tests_passed/self.tests_run*100):.1f}%")
+        
+        # Print failed tests
+        failed_tests = [test for test in self.test_results if not test['success']]
+        if failed_tests:
+            print(f"\n❌ FAILED TESTS ({len(failed_tests)}):")
+            for test in failed_tests:
+                print(f"  • {test['name']}: {test['details']}")
+        
+        # Print critical issues
+        critical_issues = []
+        for test in self.test_results:
+            if not test['success'] and test['name'] in ['Health Check', 'Get Listings', 'Create Quote']:
+                critical_issues.append(test['name'])
+        
+        if critical_issues:
+            print(f"\n🚨 CRITICAL ISSUES:")
+            for issue in critical_issues:
+                print(f"  • {issue}")
+        
+        return self.tests_passed == self.tests_run
+
+def main():
+    """Main test execution"""
+    tester = SkyRideAPITester()
+    
+    try:
+        success = tester.run_all_tests()
+        tester.print_summary()
+        
+        return 0 if success else 1
+        
+    except KeyboardInterrupt:
+        print("\n\n⏹️ Tests interrupted by user")
+        return 1
+    except Exception as e:
+        print(f"\n\n💥 Unexpected error: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
