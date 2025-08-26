@@ -286,9 +286,15 @@ def parse_from_mongo(item):
                     item[key] = datetime.fromisoformat(value)
                 except:
                     pass
-            # Convert ObjectId to string for _id fields
-            elif key == '_id' and hasattr(value, '__str__'):
+            # Convert ObjectId to string for _id fields and any field ending with 'Id'
+            elif (key == '_id' or key.endswith('Id')) and hasattr(value, '__str__') and 'ObjectId' in str(type(value)):
                 item[key] = str(value)
+            # Recursively parse nested dictionaries
+            elif isinstance(value, dict):
+                item[key] = parse_from_mongo(value)
+            # Parse lists of dictionaries
+            elif isinstance(value, list):
+                item[key] = [parse_from_mongo(v) if isinstance(v, dict) else v for v in value]
     return item
 
 async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional[str]:
