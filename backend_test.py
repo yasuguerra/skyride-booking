@@ -265,7 +265,7 @@ class SkyRideAPITester:
             print("\n⚠️ Hold creation failed - continuing with other tests")
 
         # Test 6: Checkout (expected to fail in MVP without booking creation)
-        checkout = self.test_checkout_endpoint(quote_details['id'] if quote_details else 'test-id')
+        checkout = self.test_checkout_endpoint(quote_details['_id'] if quote_details else 'test-id')
 
         return True
 
