@@ -571,23 +571,31 @@ async def create_hold(hold_data: HoldCreate):
 @api_router.post("/checkout", response_model=Dict[str, Any])
 async def create_checkout(checkout_data: CheckoutCreate):
     """Create checkout for booking"""
-    # First try to find booking by orderId
-    booking = await db.bookings.find_one({"_id": checkout_data.orderId})
+    order_id = checkout_data.orderId
+    
+    # First try to find existing booking
+    booking = await db.bookings.find_one({"_id": order_id})
     
     if not booking:
-        # If not found, try to find by quote ID and create booking
-        quote = await db.quotes.find_one({"_id": checkout_data.orderId})
+        # If not found, try to find quote and create booking from it
+        quote = await db.quotes.find_one({"_id": order_id})
+        if not quote:
+            # Try by token
+            quote = await db.quotes.find_one({"token": order_id})
+        
         if quote:
-            # Create booking from quote for MVP
+            # Create booking from quote
+            booking_number = f"SR{datetime.now(timezone.utc).strftime('%Y%m%d')}{quote['token'][:8].upper()}"
+            
             booking_data = {
-                "_id": quote["_id"],  # Use quote ID as booking ID for MVP
-                "quoteId": quote["_id"],
+                "_id": str(uuid.uuid4()),
+                "quoteId": str(quote["_id"]),
                 "operatorId": "op_panama_elite",  # Default for MVP
                 "totalAmount": quote["totalPrice"],
                 "departureDate": quote["departureDate"],
                 "returnDate": quote.get("returnDate"),
                 "status": "PENDING",
-                "bookingNumber": f"SR{datetime.now().strftime('%Y%m%d')}{quote['token'][:8].upper()}",
+                "bookingNumber": booking_number,
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "updatedAt": datetime.now(timezone.utc).isoformat()
             }
@@ -596,23 +604,33 @@ async def create_checkout(checkout_data: CheckoutCreate):
             booking = booking_data
     
     if not booking:
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise HTTPException(status_code=404, detail="Booking or quote not found")
     
     if checkout_data.provider == PaymentProvider.WOMPI:
-        payment_link = await create_wompi_payment_link(Booking(**parse_from_mongo(booking)), booking["totalAmount"])
+        # Create mock booking object for payment link generation
+        mock_booking = type('MockBooking', (), {
+            'id': booking.get('_id'),
+            'bookingNumber': booking.get('bookingNumber', 'UNKNOWN'),
+            'totalAmount': booking.get('totalAmount', 0)
+        })()
+        
+        payment_link = await create_wompi_payment_link(mock_booking, booking["totalAmount"])
         
         if payment_link:
             # Create payment record
-            payment = Payment(
-                bookingId=booking["_id"],
-                provider=PaymentProvider.WOMPI,
-                amount=booking["totalAmount"],
-                paymentLinkUrl=payment_link,
-                description=f"Booking #{booking['bookingNumber']}"
-            )
+            payment_data = {
+                "_id": str(uuid.uuid4()),
+                "bookingId": booking["_id"],
+                "provider": "WOMPI",
+                "amount": booking["totalAmount"],
+                "paymentLinkUrl": payment_link,
+                "description": f"Booking #{booking['bookingNumber']}",
+                "status": "PENDING",
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "updatedAt": datetime.now(timezone.utc).isoformat()
+            }
             
-            payment_dict = prepare_for_mongo(payment.dict())
-            await db.payments.insert_one(payment_dict)
+            await db.payments.insert_one(payment_data)
             
             return {"paymentLinkUrl": payment_link}
         else:
