@@ -101,7 +101,7 @@ class SkyRideAPITester:
                 # Validate listing structure if we have listings
                 if listings_count > 0:
                     first_listing = data[0]
-                    required_fields = ['id', 'basePrice', 'serviceFee', 'totalPrice', 'operator', 'aircraft', 'route']
+                    required_fields = ['_id', 'basePrice', 'serviceFee', 'totalPrice', 'operator', 'aircraft', 'route']
                     missing_fields = [field for field in required_fields if field not in first_listing]
                     
                     if missing_fields:
