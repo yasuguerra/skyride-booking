@@ -681,6 +681,8 @@ function App() {
           <Route path="/q/:token" element={<HostedQuote />} />
           <Route path="/checkout/:orderId" element={<Checkout />} />
           <Route path="/success" element={<Success />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/ops" element={<AdminDashboard />} />
         </Routes>
       </BrowserRouter>
     </div>
