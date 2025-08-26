@@ -1,0 +1,435 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-py"
+  output = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Operator {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique // e.g., "SKY001"
+  email       String
+  phone       String?
+  website     String?
+  logo        String?
+  active      Boolean  @default(true)
+  
+  // SaaS settings
+  distributionOptIn Boolean @default(false)
+  priceFloor       Float?
+  emptyLegWindow   Int?    // minutes
+  
+  // Score metrics
+  acceptanceRate   Float   @default(0)
+  avgResponseTime  Int     @default(0) // seconds
+  cancelationRate  Float   @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  aircraft Aircraft[]
+  listings Listing[]
+  bookings Booking[]
+  
+  @@map("operators")
+}
+
+model Aircraft {
+  id           String  @id @default(uuid())
+  operatorId   String
+  model        String  // e.g., "Bell 407"
+  registration String  @unique // e.g., "HP-1234"
+  capacity     Int
+  hourlyRate   Float?
+  images       String[] // Array of image URLs
+  active       Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  listings Listing[]
+  
+  @@map("aircraft")
+}
+
+model Route {
+  id          String @id @default(uuid())
+  origin      String // Airport code or city
+  destination String
+  distance    Float? // nautical miles
+  duration    Int?   // minutes
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  listings Listing[]
+  
+  @@unique([origin, destination])
+  @@map("routes")
+}
+
+model Listing {
+  id           String      @id @default(uuid())
+  operatorId   String
+  aircraftId   String
+  routeId      String
+  
+  type         ListingType @default(CHARTER)
+  status       ListingStatus @default(ACTIVE)
+  
+  // Pricing
+  basePrice       Float
+  serviceFee      Float  @default(0)
+  pricePerSeat    Float? // For SEAT type
+  totalPrice      Float  // basePrice + serviceFee
+  
+  // Availability
+  availableFrom DateTime?
+  availableTo   DateTime?
+  maxPassengers Int
+  availableSeats Int?    // For SEAT/EMPTY_LEG
+  
+  // Charter specific
+  confirmationSLA Int?    // hours
+  
+  // Empty Leg specific  
+  flexibleWindow  Int?    // minutes
+  departureWindow DateTime?
+  
+  // Metadata
+  title          String?
+  description    String?
+  amenities      String[] // Array of amenities
+  images         String[] // Array of image URLs
+  featured       Boolean  @default(false)
+  boosted        Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  operator Operator @relation(fields: [operatorId], references: [id])
+  aircraft Aircraft @relation(fields: [aircraftId], references: [id])
+  route    Route    @relation(fields: [routeId], references: [id])
+  quotes   Quote[]
+  
+  @@map("listings")
+}
+
+model Quote {
+  id         String      @id @default(uuid())
+  token      String      @unique
+  listingId  String
+  customerId String?
+  
+  // Quote details
+  passengers    Int
+  departureDate DateTime
+  returnDate    DateTime?
+  
+  // Pricing breakdown
+  basePrice    Float
+  serviceFee   Float
+  totalPrice   Float
+  
+  // Status & timing
+  status     QuoteStatus @default(ACTIVE)
+  expiresAt  DateTime
+  viewedAt   DateTime?
+  
+  // Metadata
+  leadId     String?    // External lead tracking
+  source     String?    // "web", "whatsapp", "api"
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  listing  Listing   @relation(fields: [listingId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  holds    Hold[]
+  bookings Booking[]
+  events   EventLog[]
+  
+  @@map("quotes")
+}
+
+model Hold {
+  id       String     @id @default(uuid())
+  quoteId  String
+  
+  // Hold details
+  depositAmount Float?
+  status        HoldStatus @default(ACTIVE)
+  expiresAt     DateTime
+  
+  // Payment info
+  depositPaid   Boolean   @default(false)
+  depositPaidAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  quote   Quote     @relation(fields: [quoteId], references: [id])
+  booking Booking?
+  
+  @@map("holds")
+}
+
+model Customer {
+  id    String @id @default(uuid())
+  email String @unique
+  phone String?
+  
+  // Personal info
+  firstName String?
+  lastName  String?
+  
+  // Preferences
+  preferredLanguage String? @default("en")
+  
+  // Marketing
+  marketingOptIn Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  quotes   Quote[]
+  bookings Booking[]
+  messages MessageLog[]
+  
+  @@map("customers")
+}
+
+model Booking {
+  id         String        @id @default(uuid())
+  quoteId    String
+  operatorId String
+  customerId String?
+  holdId     String?       @unique
+  
+  // Booking details
+  bookingNumber String      @unique
+  status        BookingStatus @default(PENDING)
+  
+  // Pricing
+  totalAmount Float
+  paidAmount  Float        @default(0)
+  
+  // Dates
+  departureDate DateTime
+  returnDate    DateTime?
+  
+  // Payment
+  paymentDue    DateTime?
+  fullyPaidAt   DateTime?
+  
+  // Metadata
+  notes         String?
+  internalNotes String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  quote    Quote     @relation(fields: [quoteId], references: [id])
+  operator Operator  @relation(fields: [operatorId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  hold     Hold?     @relation(fields: [holdId], references: [id])
+  payments Payment[]
+  events   EventLog[]
+  
+  @@map("bookings")
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  bookingId String
+  
+  // Payment details
+  provider      PaymentProvider
+  amount        Float
+  currency      String         @default("USD")
+  status        PaymentStatus  @default(PENDING)
+  
+  // Provider specific
+  externalId       String?  // Wompi/Yappy transaction ID
+  paymentLinkUrl   String?
+  webhookPayload   Json?
+  
+  // Metadata
+  description String?
+  failureReason String?
+  
+  // Timing
+  paidAt    DateTime?
+  failedAt  DateTime?
+  expiredAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  booking Booking @relation(fields: [bookingId], references: [id])
+  
+  @@map("payments")
+}
+
+model MessageLog {
+  id         String     @id @default(uuid())
+  customerId String?
+  
+  // Message details
+  channel    MessageChannel
+  direction  MessageDirection
+  template   String?    // Template name for outbound
+  content    String?    // Message content
+  
+  // WhatsApp specific
+  waId       String?    // WhatsApp ID
+  messageId  String?    // External message ID
+  status     MessageStatus @default(SENT)
+  
+  // Context
+  quoteId    String?
+  bookingId  String?
+  
+  // Metadata
+  metadata   Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  customer Customer? @relation(fields: [customerId], references: [id])
+  
+  @@map("message_logs")
+}
+
+model EventLog {
+  id        String    @id @default(uuid())
+  
+  // Event details
+  event     String    // e.g., "quote_viewed", "hold_created"
+  entity    String    // e.g., "quote", "booking"
+  entityId  String
+  
+  // Context
+  quoteId   String?
+  bookingId String?
+  customerId String?
+  
+  // Data
+  data      Json?
+  
+  // GA4 tracking
+  sessionId String?
+  clientId  String?
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  quote   Quote?   @relation(fields: [quoteId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  
+  @@map("event_logs")
+}
+
+model Policy {
+  id          String  @id @default(uuid())
+  name        String
+  type        String  // "cancellation", "protection", "terms"
+  content     String  // HTML content
+  version     String
+  active      Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("policies")
+}
+
+// Enums
+enum ListingType {
+  CHARTER
+  EMPTY_LEG  
+  SEAT
+}
+
+enum ListingStatus {
+  ACTIVE
+  INACTIVE
+  SOLD_OUT
+  EXPIRED
+}
+
+enum QuoteStatus {
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  ABANDONED
+}
+
+enum HoldStatus {
+  ACTIVE
+  EXPIRED
+  CONVERTED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentProvider {
+  WOMPI
+  YAPPY
+  MANUAL
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+enum MessageChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  SYSTEM
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  PENDING
+}
