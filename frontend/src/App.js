@@ -14,6 +14,7 @@ import { Separator } from "./components/ui/separator";
 import { AlertCircle, Clock, Plane, MapPin, Users, Star, Shield, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "./lib/utils";
+import AdminDashboard from "./components/AdminDashboard";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
