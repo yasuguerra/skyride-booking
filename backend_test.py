@@ -160,7 +160,7 @@ class SkyRideAPITester:
             return None
 
         if status_code == 200:
-            required_fields = ['id', 'token', 'totalPrice', 'listing', 'operator', 'aircraft', 'route']
+            required_fields = ['_id', 'token', 'totalPrice', 'listing', 'operator', 'aircraft', 'route']
             missing_fields = [field for field in required_fields if field not in data]
             
             if missing_fields:
