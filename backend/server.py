@@ -286,6 +286,9 @@ def parse_from_mongo(item):
                     item[key] = datetime.fromisoformat(value)
                 except:
                     pass
+            # Convert ObjectId to string for _id fields
+            elif key == '_id' and hasattr(value, '__str__'):
+                item[key] = str(value)
     return item
 
 async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional[str]:
