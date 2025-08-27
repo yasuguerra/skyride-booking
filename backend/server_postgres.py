@@ -1323,11 +1323,6 @@ async def handle_transaction_update(transaction_data: dict, event_id: str):
         
         # Release hold if exists
         if booking['hold_id']:
-            hold_query = "SELECT redis_key FROM holds WHERE id = :hold_id"
-            hold = await database.fetch_one(hold_query, {"hold_id": booking['hold_id']})
-            if hold and hold['redis_key']:
-                await redis_client.delete(hold['redis_key'])
-            
             await database.execute(
                 "UPDATE holds SET status = 'RELEASED' WHERE id = :hold_id",
                 {"hold_id": booking['hold_id']}
