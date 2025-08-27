@@ -109,8 +109,9 @@ const AdminDashboard = () => {
               </Badge>
               <Button variant="outline" size="sm" className="border-white text-white hover:bg-white hover:text-sr-primary">
                 <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
+                Settings
+              </Button>
+            </div>
           </div>
         </div>
 
