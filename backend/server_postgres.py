@@ -173,23 +173,26 @@ async def import_operators(file: UploadFile = File(...)):
                     airport_result = await database.fetch_one(airport_query, {"code": base_airport.upper()})
                     
                     if not airport_result:
-                        # Create new airport
                         airport_id = str(uuid.uuid4())
                         airport_insert = """
                         INSERT INTO airports (id, code, name, city, country, timezone, created_at)
                         VALUES (:id, :code, :name, :city, :country, :timezone, :created_at)
-                        ON CONFLICT (code) DO NOTHING
                         """
-                        await database.execute(airport_insert, {
-                            "id": airport_id,
-                            "code": base_airport.upper(),
-                            "name": f"{base_airport.upper()} Airport",
-                            "city": "Unknown",
-                            "country": "PA",
-                            "timezone": "America/Panama",
-                            "created_at": datetime.now(timezone.utc)
-                        })
-                        base_airport_id = airport_id
+                        # Check if airport already exists to avoid duplicates
+                        existing_airport = await database.fetch_one("SELECT id FROM airports WHERE code = :code", {"code": base_airport.upper()})
+                        if not existing_airport:
+                            await database.execute(airport_insert, {
+                                "id": airport_id,
+                                "code": base_airport.upper(),
+                                "name": f"{base_airport.upper()} Airport",
+                                "city": "Unknown",
+                                "country": "PA",
+                                "timezone": "America/Panama",
+                                "created_at": datetime.now(timezone.utc)
+                            })
+                            base_airport_id = airport_id
+                        else:
+                            base_airport_id = str(existing_airport['id'])
                     else:
                         base_airport_id = str(airport_result['id'])
                 
