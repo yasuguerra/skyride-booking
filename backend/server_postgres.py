@@ -1054,9 +1054,8 @@ async def get_hold_status(hold_id: str):
     if not hold:
         raise HTTPException(status_code=404, detail="Hold not found")
     
-    # Check if still active in Redis
-    redis_status = await redis_client.get(hold['redis_key'])
-    is_active_in_redis = redis_status is not None
+    # Check if still active (simplified for MVP)
+    is_active_in_redis = hold['status'] == 'ACTIVE'
     
     hold_dict = dict(hold)
     hold_dict['active_in_redis'] = is_active_in_redis
