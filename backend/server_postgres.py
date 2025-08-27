@@ -1111,6 +1111,600 @@ async def get_hold_status(hold_id: str):
     
     return hold_dict
 
+# Wompi Payment Integration
+
+class WompiService:
+    """Service for Wompi payment integration"""
+    
+    def __init__(self):
+        self.base_url = os.environ.get('WOMPI_BASE_URL', 'https://api.wompi.pa')
+        self.private_key = os.environ.get('WOMPI_PRIVATE_KEY')
+        self.public_key = os.environ.get('WOMPI_PUBLIC_KEY')
+        self.webhook_secret = os.environ.get('WOMPI_WEBHOOK_SECRET')
+    
+    async def create_payment_link(self, amount: float, currency: str, reference: str, return_url: str = None) -> dict:
+        """Create a Wompi payment link"""
+        if not self.private_key:
+            raise ValueError("Wompi private key not configured")
+        
+        headers = {
+            'Authorization': f'Bearer {self.private_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'amount_in_cents': int(amount * 100),  # Convert to cents
+            'currency': currency,
+            'reference': reference,
+            'redirect_url': return_url or f"https://charter.example.com/payment/success/{reference}"
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/v1/payment_links",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            response.raise_for_status()
+            return response.json()
+            
+        except requests.RequestException as e:
+            logger.error(f"Error creating Wompi payment link: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Payment link creation failed: {str(e)}")
+    
+    def verify_webhook_signature(self, payload: str, signature: str) -> bool:
+        """Verify Wompi webhook signature"""
+        if not self.webhook_secret:
+            logger.warning("Wompi webhook secret not configured - skipping signature verification")
+            return True
+        
+        try:
+            expected_signature = hmac.new(
+                self.webhook_secret.encode('utf-8'),
+                payload.encode('utf-8'),
+                hashlib.sha256
+            ).hexdigest()
+            
+            return hmac.compare_digest(expected_signature, signature)
+            
+        except Exception as e:
+            logger.error(f"Error verifying Wompi webhook signature: {str(e)}")
+            return False
+
+wompi_service = WompiService()
+
+@api_router.post("/bookings")
+async def create_booking(booking_data: dict):
+    """Create a booking from a quote"""
+    try:
+        quote_id = booking_data.get('quote_id')
+        hold_id = booking_data.get('hold_id')
+        customer_name = booking_data.get('customer_name')
+        customer_email = booking_data.get('customer_email')
+        customer_phone = booking_data.get('customer_phone')
+        
+        if not all([quote_id, customer_name, customer_email]):
+            raise ValueError("Quote ID, customer name, and email are required")
+        
+        # Get quote
+        quote_query = "SELECT * FROM quotes WHERE id = :quote_id"
+        quote = await database.fetch_one(quote_query, {"quote_id": quote_id})
+        
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+        
+        # Check if quote is still valid
+        if quote['expires_at'] and datetime.now(timezone.utc) > quote['expires_at']:
+            raise HTTPException(status_code=400, detail="Quote has expired")
+        
+        # Generate confirmation code
+        confirmation_code = generate_confirmation_code()
+        
+        # Create booking
+        booking_id = str(uuid.uuid4())
+        booking_insert = """
+        INSERT INTO bookings (id, quote_id, hold_id, customer_name, customer_email, customer_phone, 
+                            confirmation_code, status, created_at, updated_at)
+        VALUES (:id, :quote_id, :hold_id, :customer_name, :customer_email, :customer_phone,
+                :confirmation_code, :status, :created_at, :updated_at)
+        """
+        
+        await database.execute(booking_insert, {
+            "id": booking_id,
+            "quote_id": quote_id,
+            "hold_id": hold_id,
+            "customer_name": customer_name,
+            "customer_email": customer_email,
+            "customer_phone": customer_phone,
+            "confirmation_code": confirmation_code,
+            "status": "PENDING",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
+        })
+        
+        # Create Wompi payment link
+        payment_link = await wompi_service.create_payment_link(
+            amount=float(quote['total_price']),
+            currency=quote['currency'],
+            reference=booking_id,
+            return_url=f"https://charter.example.com/booking/{booking_id}/success"
+        )
+        
+        return {
+            "booking_id": booking_id,
+            "confirmation_code": confirmation_code,
+            "status": "PENDING",
+            "payment_link": payment_link.get('permalink'),
+            "payment_link_id": payment_link.get('id'),
+            "amount": quote['total_price'],
+            "currency": quote['currency'],
+            "message": "Booking created successfully. Please complete payment."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating booking: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/webhooks/wompi")
+async def wompi_webhook(request: Request):
+    """Handle Wompi webhooks"""
+    try:
+        body = await request.body()
+        payload = body.decode('utf-8')
+        
+        # Get signature from headers
+        signature = request.headers.get('X-Event-Checksum') or request.headers.get('signature-checksum')
+        
+        # Verify signature
+        if os.environ.get('WEBHOOK_SIGNATURE_VALIDATION', 'true').lower() == 'true':
+            if not signature or not wompi_service.verify_webhook_signature(payload, signature):
+                raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        
+        # Parse event
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+        event_id = event.get('id')
+        event_type = event.get('event')
+        event_data = event.get('data', {})
+        
+        if not event_id or not event_type:
+            raise HTTPException(status_code=400, detail="Missing required event fields")
+        
+        # Check for duplicate events (idempotency)
+        existing_log = await database.fetch_one(
+            "SELECT id FROM message_logs WHERE message_id = :message_id",
+            {"message_id": event_id}
+        )
+        
+        if existing_log:
+            logger.info(f"Duplicate Wompi webhook event: {event_id}")
+            return {"status": "duplicate", "message": "Event already processed"}
+        
+        # Process event based on type
+        if event_type == 'transaction.updated':
+            await handle_transaction_update(event_data, event_id)
+        
+        # Log the webhook event
+        await database.execute("""
+        INSERT INTO message_logs (id, message_id, direction, channel, phone_number, message_type, 
+                                content, status, created_at)
+        VALUES (:id, :message_id, :direction, :channel, :phone_number, :message_type,
+                :content, :status, :created_at)
+        """, {
+            "id": str(uuid.uuid4()),
+            "message_id": event_id,
+            "direction": "INBOUND",
+            "channel": "WOMPI",
+            "phone_number": "N/A",
+            "message_type": event_type,
+            "content": payload,
+            "status": "PROCESSED",
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return {"status": "success", "message": "Webhook processed"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing Wompi webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+async def handle_transaction_update(transaction_data: dict, event_id: str):
+    """Handle transaction status updates from Wompi"""
+    transaction_id = transaction_data.get('id')
+    reference = transaction_data.get('reference')
+    status = transaction_data.get('status')
+    amount_in_cents = transaction_data.get('amount_in_cents', 0)
+    
+    if not reference or not status:
+        logger.warning(f"Incomplete transaction data in event {event_id}")
+        return
+    
+    # Find booking by reference (booking_id)
+    booking_query = "SELECT * FROM bookings WHERE id = :booking_id"
+    booking = await database.fetch_one(booking_query, {"booking_id": reference})
+    
+    if not booking:
+        logger.warning(f"Booking not found for Wompi reference: {reference}")
+        return
+    
+    # Update booking based on transaction status
+    if status in ['APPROVED', 'SETTLED']:
+        # Payment successful
+        booking_update = """
+        UPDATE bookings 
+        SET status = 'PAID', payment_method = 'WOMPI', payment_reference = :payment_reference,
+            paid_amount = :paid_amount, paid_at = :paid_at, updated_at = :updated_at
+        WHERE id = :booking_id
+        """
+        
+        await database.execute(booking_update, {
+            "booking_id": reference,
+            "payment_reference": transaction_id,
+            "paid_amount": amount_in_cents / 100.0,
+            "paid_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
+        })
+        
+        # Convert hold to confirmed if exists
+        if booking['hold_id']:
+            await database.execute(
+                "UPDATE holds SET status = 'CONVERTED' WHERE id = :hold_id",
+                {"hold_id": booking['hold_id']}
+            )
+        
+        logger.info(f"Booking {reference} payment confirmed via Wompi")
+        
+    elif status in ['DECLINED', 'ERROR', 'VOIDED']:
+        # Payment failed
+        await database.execute(
+            "UPDATE bookings SET status = 'CANCELLED', updated_at = :updated_at WHERE id = :booking_id",
+            {"booking_id": reference, "updated_at": datetime.now(timezone.utc)}
+        )
+        
+        # Release hold if exists
+        if booking['hold_id']:
+            hold_query = "SELECT redis_key FROM holds WHERE id = :hold_id"
+            hold = await database.fetch_one(hold_query, {"hold_id": booking['hold_id']})
+            if hold and hold['redis_key']:
+                await redis_client.delete(hold['redis_key'])
+            
+            await database.execute(
+                "UPDATE holds SET status = 'RELEASED' WHERE id = :hold_id",
+                {"hold_id": booking['hold_id']}
+            )
+        
+        logger.info(f"Booking {reference} payment failed via Wompi: {status}")
+
+@api_router.get("/bookings/{booking_id}")
+async def get_booking(booking_id: str):
+    """Get booking details"""
+    booking_query = """
+    SELECT b.*, q.total_price, q.currency, l.title as listing_title
+    FROM bookings b
+    JOIN quotes q ON b.quote_id = q.id
+    JOIN listings l ON q.listing_id = l.id
+    WHERE b.id = :booking_id
+    """
+    
+    booking = await database.fetch_one(booking_query, {"booking_id": booking_id})
+    
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    return dict(booking)
+
+# WhatsApp/Chatrace Integration
+
+class ChatraceService:
+    """Service for Chatrace WhatsApp integration"""
+    
+    def __init__(self):
+        self.base_url = os.environ.get('CHATRACE_BASE_URL', 'https://api.chatrace.com')
+        self.api_key = os.environ.get('CHATRACE_API_KEY')
+        self.instance_id = os.environ.get('CHATRACE_INSTANCE_ID')
+        self.phone_number = os.environ.get('CHATRACE_PHONE_NUMBER', '15557298766')
+    
+    async def send_template_message(self, to_number: str, template_name: str, variables: list = None) -> dict:
+        """Send WhatsApp template message via Chatrace"""
+        if not self.api_key or not self.instance_id:
+            raise ValueError("Chatrace credentials not configured")
+        
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'instance_id': self.instance_id,
+            'to': to_number,
+            'template_name': template_name,
+            'variables': variables or []
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/v1/messages/template",
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                ) as response:
+                    response.raise_for_status()
+                    return await response.json()
+                    
+        except Exception as e:
+            logger.error(f"Error sending Chatrace template: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Template send failed: {str(e)}")
+    
+    def generate_click_to_chat_url(self, message: str = None) -> str:
+        """Generate WhatsApp Click-to-Chat URL"""
+        base_url = f"https://wa.me/{self.phone_number.replace('+', '')}"
+        
+        if message:
+            import urllib.parse
+            encoded_message = urllib.parse.quote(message, safe='')
+            return f"{base_url}?text={encoded_message}"
+        
+        return base_url
+
+chatrace_service = ChatraceService()
+
+@api_router.post("/wa/send-template")
+async def send_whatsapp_template(template_data: dict):
+    """Send WhatsApp template message"""
+    try:
+        to_number = template_data.get('to')
+        template_name = template_data.get('template_name')
+        variables = template_data.get('variables', [])
+        booking_id = template_data.get('booking_id')
+        
+        if not to_number or not template_name:
+            raise ValueError("Phone number and template name are required")
+        
+        # Send template
+        result = await chatrace_service.send_template_message(to_number, template_name, variables)
+        
+        # Log the message
+        message_id = result.get('id', str(uuid.uuid4()))
+        
+        await database.execute("""
+        INSERT INTO message_logs (id, message_id, direction, channel, phone_number, 
+                                message_type, template_name, content, status, booking_id, created_at)
+        VALUES (:id, :message_id, :direction, :channel, :phone_number,
+                :message_type, :template_name, :content, :status, :booking_id, :created_at)
+        """, {
+            "id": str(uuid.uuid4()),
+            "message_id": message_id,
+            "direction": "OUTBOUND",
+            "channel": "WHATSAPP",
+            "phone_number": to_number,
+            "message_type": "template",
+            "template_name": template_name,
+            "content": json.dumps({"variables": variables}),
+            "status": "SENT",
+            "booking_id": booking_id,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return {
+            "message_id": message_id,
+            "status": "sent",
+            "template_name": template_name,
+            "to": to_number
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending WhatsApp template: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/webhooks/wa")
+async def whatsapp_webhook(request: Request):
+    """Handle WhatsApp webhooks from Chatrace"""
+    try:
+        body = await request.body()
+        payload = body.decode('utf-8')
+        
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+        message_id = event.get('id') or event.get('message_id')
+        event_type = event.get('type') or event.get('event_type')
+        phone_number = event.get('from') or event.get('phone')
+        
+        if not message_id:
+            raise HTTPException(status_code=400, detail="Missing message ID")
+        
+        # Check for duplicate events (idempotency)
+        existing_log = await database.fetch_one(
+            "SELECT id FROM message_logs WHERE message_id = :message_id",
+            {"message_id": message_id}
+        )
+        
+        if existing_log:
+            logger.info(f"Duplicate WhatsApp webhook event: {message_id}")
+            return {"status": "duplicate", "message": "Event already processed"}
+        
+        # Determine message direction and type
+        direction = "INBOUND" if event_type in ['message', 'text', 'media'] else "STATUS"
+        status = None
+        content = None
+        
+        if direction == "INBOUND":
+            content = event.get('text') or event.get('caption') or json.dumps(event.get('media', {}))
+        else:
+            status = event_type  # delivered, read, etc.
+        
+        # Log the webhook event
+        await database.execute("""
+        INSERT INTO message_logs (id, message_id, direction, channel, phone_number, 
+                                message_type, content, status, created_at, updated_at)
+        VALUES (:id, :message_id, :direction, :channel, :phone_number,
+                :message_type, :content, :status, :created_at, :updated_at)
+        """, {
+            "id": str(uuid.uuid4()),
+            "message_id": message_id,
+            "direction": direction,
+            "channel": "WHATSAPP",
+            "phone_number": phone_number or "unknown",
+            "message_type": event_type,
+            "content": content,
+            "status": status or "RECEIVED",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
+        })
+        
+        return {"status": "success", "message": "Webhook processed"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing WhatsApp webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+@api_router.get("/wa/click-to-chat")
+async def get_click_to_chat_url(message: str = None):
+    """Get WhatsApp Click-to-Chat URL"""
+    url = chatrace_service.generate_click_to_chat_url(message)
+    return {"click_to_chat_url": url, "phone_number": chatrace_service.phone_number}
+
+# PriceBook Management
+
+@api_router.post("/admin/pricebook/import")
+async def import_pricebook(file: UploadFile = File(...)):
+    """Import pricebook from CSV"""
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be CSV (.csv)")
+    
+    try:
+        df = pd.read_csv(file.file)
+        import_run_id = await create_import_run("pricebook", file.filename, len(df))
+        success_count = 0
+        error_count = 0
+        
+        for idx, row in df.iterrows():
+            try:
+                origin_code = row.get('origin_code', '').strip().upper()
+                destination_code = row.get('destination_code', '').strip().upper()
+                aircraft_type = row.get('aircraft_type', '').strip()
+                operator_name = row.get('operator', '').strip() if pd.notna(row.get('operator')) else None
+                base_price = float(row.get('base_price', 0))
+                currency = row.get('currency', 'USD').strip()
+                
+                if not origin_code or not destination_code or base_price <= 0:
+                    raise ValueError("Origin, destination, and valid base price are required")
+                
+                # Find airports
+                origin_query = "SELECT id FROM airports WHERE code = :code"
+                dest_query = "SELECT id FROM airports WHERE code = :code"
+                origin_result = await database.fetch_one(origin_query, {"code": origin_code})
+                dest_result = await database.fetch_one(dest_query, {"code": destination_code})
+                
+                if not origin_result:
+                    raise ValueError(f"Origin airport '{origin_code}' not found")
+                if not dest_result:
+                    raise ValueError(f"Destination airport '{destination_code}' not found")
+                
+                # Find operator if specified
+                operator_id = None
+                if operator_name:
+                    operator_query = "SELECT id FROM operators WHERE name = :name"
+                    operator_result = await database.fetch_one(operator_query, {"name": operator_name})
+                    if operator_result:
+                        operator_id = str(operator_result['id'])
+                
+                # Upsert pricebook entry
+                pricebook_id = str(uuid.uuid4())
+                pricebook_upsert = """
+                INSERT INTO pricebook (id, operator_id, aircraft_type, origin_id, destination_id, 
+                                     base_price, currency, effective_from, created_at, updated_at)
+                VALUES (:id, :operator_id, :aircraft_type, :origin_id, :destination_id,
+                        :base_price, :currency, :effective_from, :created_at, :updated_at)
+                ON CONFLICT (operator_id, aircraft_type, origin_id, destination_id) DO UPDATE SET
+                    base_price = EXCLUDED.base_price,
+                    currency = EXCLUDED.currency,
+                    updated_at = EXCLUDED.updated_at
+                """
+                
+                await database.execute(pricebook_upsert, {
+                    "id": pricebook_id,
+                    "operator_id": operator_id,
+                    "aircraft_type": aircraft_type if aircraft_type else None,
+                    "origin_id": str(origin_result['id']),
+                    "destination_id": str(dest_result['id']),
+                    "base_price": base_price,
+                    "currency": currency,
+                    "effective_from": datetime.now(timezone.utc),
+                    "created_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(timezone.utc)
+                })
+                
+                success_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                await log_import_error(import_run_id, idx + 1, "PROCESSING_ERROR", str(e), row.to_dict())
+        
+        await complete_import_run(import_run_id, success_count, error_count, {
+            "pricebook_entries_created": success_count,
+            "errors": error_count
+        })
+        
+        return {
+            "import_run_id": import_run_id,
+            "success_count": success_count,
+            "error_count": error_count,
+            "message": f"Processed {success_count + error_count} rows, {success_count} successful, {error_count} errors"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error importing pricebook: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+@api_router.get("/admin/pricebook/export")
+async def export_pricebook():
+    """Export pricebook as CSV"""
+    from fastapi.responses import StreamingResponse
+    import io
+    
+    pricebook_query = """
+    SELECT p.*, o_orig.code as origin_code, o_dest.code as destination_code, op.name as operator_name
+    FROM pricebook p
+    JOIN airports o_orig ON p.origin_id = o_orig.id
+    JOIN airports o_dest ON p.destination_id = o_dest.id
+    LEFT JOIN operators op ON p.operator_id = op.id
+    ORDER BY o_orig.code, o_dest.code, p.aircraft_type
+    """
+    
+    results = await database.fetch_all(pricebook_query)
+    
+    if not results:
+        raise HTTPException(status_code=404, detail="No pricebook entries found")
+    
+    # Create CSV
+    df = pd.DataFrame([dict(result) for result in results])
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)
+    
+    return StreamingResponse(
+        io.BytesIO(csv_buffer.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=pricebook_export.csv"}
+    )
+
 # Include the router
 app.include_router(api_router)
 
