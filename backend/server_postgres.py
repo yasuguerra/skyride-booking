@@ -1030,15 +1030,12 @@ async def release_hold(hold_id: str):
         if hold['status'] != 'ACTIVE':
             raise HTTPException(status_code=400, detail="Hold is not active")
         
-        # Remove from Redis
-        await redis_client.delete(hold['redis_key'])
+        # Remove from database (simplified for MVP)
+        # In production, would remove from Redis
         
         # Update hold status
-        hold_update = "UPDATE holds SET status = 'RELEASED', updated_at = :updated_at WHERE id = :hold_id"
-        await database.execute(hold_update, {
-            "hold_id": hold_id,
-            "updated_at": datetime.now(timezone.utc)
-        })
+        hold_update = "UPDATE holds SET status = 'RELEASED' WHERE id = :hold_id"
+        await database.execute(hold_update, {"hold_id": hold_id})
         
         return {"message": "Hold released successfully"}
         
