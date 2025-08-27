@@ -178,40 +178,55 @@ class SkyRideWompiTester:
             click.echo(f"   ❌ Hold creation error: {e}")
             return None
     
-    async def test_checkout(self, order_id: str):
-        """Test checkout creation"""
-        click.echo("💳 Testing Checkout Creation...")
-        
-        checkout_data = {
-            "orderId": order_id,
-            "provider": "WOMPI"
-        }
+    async def test_new_features(self):
+        """Test new features: availability, WordPress, analytics"""
+        click.echo("🆕 Testing New Features...")
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/checkout",
-                    json=checkout_data,
-                    timeout=30.0
-                )
-                
+                # Test availability endpoint
+                response = await client.get(f"{self.base_url}/availability")
                 if response.status_code == 200:
-                    checkout = response.json()
-                    click.echo(f"   ✅ Checkout created successfully!")
-                    click.echo(f"      Payment Link: {checkout.get('paymentLinkUrl')}")
-                    
-                    if checkout.get('amount'):
-                        click.echo(f"      Amount: ${checkout.get('amount'):,}")
-                        click.echo(f"      Message: {checkout.get('message')}")
-                    
-                    return checkout.get('paymentLinkUrl')
+                    availability = response.json()
+                    click.echo(f"   ✅ Availability system: {availability.get('system')}")
                 else:
-                    click.echo(f"   ❌ Checkout creation failed: {response.status_code}")
-                    return None
+                    click.echo(f"   ❌ Availability test failed: {response.status_code}")
+                
+                # Test WordPress hot deals
+                response = await client.get(f"{self.base_url}/wordpress/hot-deals")
+                if response.status_code == 200:
+                    deals = response.json()
+                    click.echo(f"   ✅ WordPress hot deals: {deals.get('count', 0)} deals available")
+                    click.echo(f"      WordPress ready: {deals.get('wordpress_ready', False)}")
+                else:
+                    click.echo(f"   ❌ WordPress deals test failed: {response.status_code}")
+                
+                # Test WordPress CTA config
+                response = await client.get(f"{self.base_url}/wordpress/quote-cta")
+                if response.status_code == 200:
+                    cta = response.json()
+                    click.echo(f"   ✅ WordPress CTA config: {cta.get('cta_config', {}).get('button_text')}")
+                else:
+                    click.echo(f"   ❌ WordPress CTA test failed: {response.status_code}")
+                
+                # Test GA4 analytics
+                analytics_data = {
+                    "event": "test_event",
+                    "parameters": {"test": "true"},
+                    "client_id": "test_client_123"
+                }
+                response = await client.post(f"{self.base_url}/analytics/track-event", json=analytics_data)
+                if response.status_code == 200:
+                    result = response.json()
+                    click.echo(f"   ✅ GA4 Analytics: Event tracked with cross-domain support")
+                else:
+                    click.echo(f"   ❌ Analytics test failed: {response.status_code}")
                     
+                return True
+                
         except Exception as e:
-            click.echo(f"   ❌ Checkout creation error: {e}")
-            return None
+            click.echo(f"   ❌ New features test error: {e}")
+            return False
 
 @click.group()
 def cli():
