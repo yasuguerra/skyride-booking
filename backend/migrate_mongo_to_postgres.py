@@ -384,7 +384,7 @@ class MongoToPostgresMigrator:
                     status=doc.get('status', 'SENT'),
                     quote_id=uuid.UUID(doc['quoteId']) if doc.get('quoteId') and self._is_uuid(doc['quoteId']) else None,
                     booking_id=uuid.UUID(doc['bookingId']) if doc.get('bookingId') and self._is_uuid(doc['bookingId']) else None,
-                    metadata=doc.get('metadata'),
+                    message_metadata=doc.get('metadata'),  # Changed field name
                     created_at=self._parse_datetime(doc.get('createdAt')),
                     updated_at=self._parse_datetime(doc.get('updatedAt'))
                 )
