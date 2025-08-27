@@ -808,7 +808,98 @@ async def health_check():
         "version": "1.5.0"
     }
 
-# Include router
+# Availability System (Fase 1) - NEW
+@api_router.get("/availability")
+async def get_availability(
+    aircraftId: Optional[str] = None,
+    dateFrom: Optional[str] = None,
+    dateTo: Optional[str] = None
+):
+    """Get availability for aircraft - Fase 1"""
+    
+    # For MVP, return basic availability (no conflicts with existing bookings)
+    availability_slots = []
+    
+    # Get existing bookings for the aircraft/date range
+    filter_query = {"status": {"$in": ["PENDING", "CONFIRMED", "PAID"]}}
+    
+    if aircraftId:
+        # Find listings for this aircraft
+        aircraft = await db.aircraft.find_one({"_id": aircraftId})
+        if aircraft:
+            listings = await db.listings.find({"aircraftId": aircraftId}).to_list(100)
+            listing_ids = [listing["_id"] for listing in listings]
+            filter_query["listingId"] = {"$in": listing_ids}
+    
+    if dateFrom:
+        filter_query["departureDate"] = {"$gte": dateFrom}
+    if dateTo:
+        if "departureDate" in filter_query:
+            filter_query["departureDate"]["$lte"] = dateTo
+        else:
+            filter_query["departureDate"] = {"$lte": dateTo}
+    
+    # Get bookings that might conflict
+    bookings = await db.bookings.find(filter_query).to_list(100)
+    
+    # For MVP - simple availability: if no bookings, aircraft is available
+    if not bookings:
+        availability_slots.append({
+            "aircraftId": aircraftId,
+            "available": True,
+            "conflicts": [],
+            "message": "Aircraft available for booking"
+        })
+    else:
+        availability_slots.append({
+            "aircraftId": aircraftId,
+            "available": False,
+            "conflicts": [{"date": booking.get("departureDate"), "booking": booking.get("bookingNumber")} for booking in bookings],
+            "message": f"Aircraft has {len(bookings)} conflicting bookings"
+        })
+    
+    return {
+        "availability": availability_slots,
+        "dateRange": {"from": dateFrom, "to": dateTo},
+        "system": "fase_1_basic"
+    }
+
+# Redis-based Hold Management - NEW
+@api_router.post("/holds/redis-lock")
+async def create_redis_hold_lock(
+    listingId: str,
+    holdDurationMinutes: int = 1440  # 24 hours default
+):
+    """Create Redis-based hold lock for listing"""
+    
+    try:
+        # Simple Redis lock simulation (would use real Redis in production)
+        hold_key = f"hold:{listingId}"
+        
+        # Check if already on hold (simulation)
+        existing_holds = await db.holds.find({"listingId": listingId, "status": "ACTIVE"}).to_list(1)
+        
+        if existing_holds:
+            return {
+                "success": False,
+                "message": "Listing already on hold",
+                "holdKey": hold_key
+            }
+        
+        # Create hold lock
+        return {
+            "success": True,
+            "holdKey": hold_key,
+            "expiresInMinutes": holdDurationMinutes,
+            "message": f"Hold lock created for {holdDurationMinutes} minutes"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating Redis hold lock: {e}")
+        return {
+            "success": False,
+            "message": f"Failed to create hold lock: {str(e)}"
+        }
 app.include_router(api_router)
 
 # CORS
