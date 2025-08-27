@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: skyride-postgres
+    environment:
+      POSTGRES_USER: skyride_user
+      POSTGRES_PASSWORD: skyride_password
+      POSTGRES_DB: skyride
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - skyride-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyride_user -d skyride"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Locks
+  redis:
+    image: redis:7-alpine
+    container_name: skyride-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - skyride-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # SkyRide Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: skyride-backend
+    environment:
+      - POSTGRES_URL=postgresql+asyncpg://skyride_user:skyride_password@postgres:5432/skyride
+      - REDIS_URL=redis://redis:6379/0
+      - CORS_ORIGINS=http://localhost:3000,https://www.skyride.city,https://booking.skyride.city
+      - WOMPI_PUBLIC_KEY=${WOMPI_PUBLIC_KEY:-__PROVIDED__}
+      - WOMPI_PRIVATE_KEY=${WOMPI_PRIVATE_KEY:-__PROVIDED__}
+      - WOMPI_WEBHOOK_SECRET=${WOMPI_WEBHOOK_SECRET:-__PROVIDED__}
+      - WOMPI_ENV=${WOMPI_ENV:-test}
+      - CHATRACE_API_URL=${CHATRACE_API_URL:-__PROVIDED__}
+      - CHATRACE_API_TOKEN=${CHATRACE_API_TOKEN:-__PROVIDED__}
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-G-XXXXXXXXXX}
+      - BASE_URL=http://localhost:8001
+      - PAYMENTS_DRY_RUN=false
+      - EMPTY_LEGS_ENABLED=true
+      - YAPPY_ENABLED=false
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skyride-network
+    restart: unless-stopped
+    command: uvicorn server_postgres:app --host 0.0.0.0 --port 8001 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SkyRide Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: skyride-frontend
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8001
+      - REACT_APP_GA4_ID=${GA_MEASUREMENT_ID:-G-XXXXXXXXXX}
+      - REACT_APP_CROSS_DOMAIN=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - skyride-network
+    restart: unless-stopped
+    command: yarn start
+
+  # MongoDB (for migration purposes)
+  mongo:
+    image: mongo:7
+    container_name: skyride-mongo-migration
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: skyride_mongo
+      MONGO_INITDB_DATABASE: skyride
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - skyride-network
+    profiles:
+      - migration
+
+  # pgAdmin for PostgreSQL management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: skyride-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@skyride.city
+      PGADMIN_DEFAULT_PASSWORD: skyride_admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - skyride-network
+    profiles:
+      - admin
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: skyride-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - skyride-network
+    profiles:
+      - admin
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  mongo_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  skyride-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
