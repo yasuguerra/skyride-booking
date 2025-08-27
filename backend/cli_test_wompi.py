@@ -316,7 +316,7 @@ def full():
         # Test hold creation
         hold_id = await tester.test_hold_creation(token)
         if not hold_id:
-            click.echo("❌ Hold creation failed, skipping checkout test")
+            click.echo("❌ Hold creation failed, skipping new features test")
             return
         
         click.echo()
