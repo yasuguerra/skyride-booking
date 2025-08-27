@@ -447,17 +447,26 @@ async def import_flights(file: UploadFile = File(...)):
                         
                         if origin_result and dest_result:
                             route_id = str(uuid.uuid4())
-                            route_insert = """
-                            INSERT INTO routes (id, origin_id, destination_id, typical_duration_min, created_at)
-                            VALUES (:id, :origin_id, :destination_id, :typical_duration_min, :created_at)
-                            """
-                            await database.execute(route_insert, {
-                                "id": route_id,
-                                "origin_id": str(origin_result['id']),
-                                "destination_id": str(dest_result['id']),
-                                "typical_duration_min": int(flight_duration) if pd.notna(flight_duration) else None,
-                                "created_at": datetime.now(timezone.utc)
-                            })
+                            # Check if route exists to avoid duplicates
+                            existing_route = await database.fetch_one(
+                                "SELECT id FROM routes WHERE origin_id = :origin_id AND destination_id = :destination_id",
+                                {"origin_id": str(origin_result['id']), "destination_id": str(dest_result['id'])}
+                            )
+                            
+                            if not existing_route:
+                                route_insert = """
+                                INSERT INTO routes (id, origin_id, destination_id, typical_duration_min, created_at)
+                                VALUES (:id, :origin_id, :destination_id, :typical_duration_min, :created_at)
+                                """
+                                await database.execute(route_insert, {
+                                    "id": route_id,
+                                    "origin_id": str(origin_result['id']),
+                                    "destination_id": str(dest_result['id']),
+                                    "typical_duration_min": int(flight_duration) if pd.notna(flight_duration) else None,
+                                    "created_at": datetime.now(timezone.utc)
+                                })
+                            else:
+                                route_id = str(existing_route['id'])
                     else:
                         route_id = str(route_result['id'])
                 else:
