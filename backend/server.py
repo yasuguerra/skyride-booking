@@ -900,6 +900,120 @@ async def create_redis_hold_lock(
             "success": False,
             "message": f"Failed to create hold lock: {str(e)}"
         }
+
+# WordPress Integration & Embeds - NEW
+@api_router.get("/wordpress/hot-deals")
+async def get_hot_deals_for_wordpress(limit: int = 6):
+    """Get hot deals for WordPress embed"""
+    
+    # Get empty leg listings if enabled
+    empty_legs_enabled = os.getenv('EMPTY_LEGS_ENABLED', 'false').lower() == 'true'
+    
+    if not empty_legs_enabled:
+        return {
+            "deals": [],
+            "message": "Empty legs feature not enabled yet",
+            "feature_flag": "EMPTY_LEGS_ENABLED=false"
+        }
+    
+    # Get featured listings as "hot deals" for now
+    filter_query = {
+        "status": "ACTIVE", 
+        "$or": [
+            {"featured": True},
+            {"boosted": True}
+        ]
+    }
+    
+    listings = await db.listings.find(filter_query).limit(limit).to_list(limit)
+    
+    deals = []
+    for listing in listings:
+        # Get related data
+        operator = await db.operators.find_one({"_id": listing["operatorId"]})
+        aircraft = await db.aircraft.find_one({"_id": listing["aircraftId"]})
+        route = await db.routes.find_one({"_id": listing["routeId"]})
+        
+        deal = {
+            "id": listing["_id"],
+            "title": f"{aircraft.get('model', 'Aircraft')} - {route.get('origin', '')} to {route.get('destination', '')}",
+            "price": listing.get("totalPrice", 0),
+            "currency": "USD",
+            "operator": operator.get("name", ""),
+            "aircraft": aircraft.get("model", ""),
+            "route": f"{route.get('origin', '')} → {route.get('destination', '')}",
+            "passengers": listing.get("maxPassengers", 1),
+            "bookingUrl": f"{os.getenv('BASE_URL')}/q/{listing['_id']}",  # Would create quote first
+            "featured": listing.get("featured", False),
+            "boosted": listing.get("boosted", False)
+        }
+        deals.append(deal)
+    
+    return {
+        "deals": deals,
+        "count": len(deals),
+        "wordpress_ready": True
+    }
+
+@api_router.get("/wordpress/quote-cta")
+async def get_quote_cta_config():
+    """Get configuration for WordPress 'Cotiza ahora' CTA button"""
+    
+    return {
+        "cta_config": {
+            "button_text": "Cotiza ahora",
+            "button_url": f"{os.getenv('BASE_URL')}/",
+            "iframe_url": f"{os.getenv('BASE_URL')}/embed/quote",
+            "target": "_blank",
+            "style": "primary"
+        },
+        "embed_script": f'<script src="{os.getenv("BASE_URL")}/js/skyride-embed.js" data-mode="quote"></script>',
+        "iframe_code": f'<iframe src="{os.getenv("BASE_URL")}/embed/quote" width="100%" height="600" frameborder="0"></iframe>'
+    }
+
+# GA4 Cross-domain Events - NEW
+@api_router.post("/analytics/track-event")
+async def track_ga4_event(
+    event: str,
+    parameters: Optional[Dict[str, Any]] = None,
+    client_id: Optional[str] = None,
+    session_id: Optional[str] = None
+):
+    """Track GA4 events for cross-domain analytics"""
+    
+    # Log event for GA4 processing
+    event_data = {
+        "event": event,
+        "parameters": parameters or {},
+        "client_id": client_id,
+        "session_id": session_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "domain": "booking.skyride.city"
+    }
+    
+    # Store in event log
+    event_log_data = {
+        "_id": str(uuid.uuid4()),
+        "event": event,
+        "entity": "analytics",
+        "entityId": client_id or str(uuid.uuid4()),
+        "data": event_data,
+        "sessionId": session_id,
+        "clientId": client_id,
+        "createdAt": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.event_logs.insert_one(event_log_data)
+    
+    logger.info(f"📊 GA4 Event tracked: {event} (client: {client_id})")
+    
+    return {
+        "tracked": True,
+        "event": event,
+        "client_id": client_id,
+        "cross_domain": True
+    }
+
 app.include_router(api_router)
 
 # CORS
