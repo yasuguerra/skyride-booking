@@ -18,7 +18,7 @@ load_dotenv()
 # Database Configuration
 DATABASE_URL = os.getenv(
     'POSTGRES_URL', 
-    'postgresql+asyncpg://postgres:password@localhost:5432/skyride'
+    'sqlite+aiosqlite:///./skyride_postgres.db'  # SQLite for demo
 )
 
 # Create async engine
