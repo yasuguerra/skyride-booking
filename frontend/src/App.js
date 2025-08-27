@@ -562,11 +562,15 @@ const HostedQuote = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/90 backdrop-blur-sm">
+            <Card className="card bg-white shadow-sr">
               <CardHeader>
-                <CardTitle className="text-sm">Protection Included</CardTitle>
+                <div className="sr-protection-badge inline-block mb-2">
+                  <Shield className="h-4 w-4 mr-2 inline" />
+                  Sky Ride Protection
+                </div>
+                <CardTitle className="text-sm font-sr font-semibold text-sr-primary">Protection Included</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm space-y-2">
+              <CardContent className="text-sm space-y-2 font-sr">
                 <div className="flex items-center text-green-700">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Weather delay protection
@@ -578,6 +582,9 @@ const HostedQuote = () => {
                 <div className="flex items-center text-green-700">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   24/7 concierge support
+                </div>
+                <div className="sr-pricematch-badge mt-3 inline-block">
+                  Price-Match + Perk Guarantee
                 </div>
               </CardContent>
             </Card>
