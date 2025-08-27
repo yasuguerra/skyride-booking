@@ -18,7 +18,7 @@ load_dotenv()
 
 class SkyRideWompiTester:
     def __init__(self):
-        self.base_url = "https://charter-hub-1.preview.emergentagent.com/api"
+        self.base_url = "https://flightdb-shift.preview.emergentagent.com/api"
         self.wompi_public_key = os.getenv('WOMPI_PUBLIC_KEY', '__PROVIDED__')
         self.wompi_private_key = os.getenv('WOMPI_PRIVATE_KEY', '__PROVIDED__')
         self.dry_run = os.getenv('DRY_RUN', 'true').lower() == 'true'
@@ -341,7 +341,7 @@ def full():
     asyncio.run(run_full_test())
 
 @cli.command()
-@click.option('--url', default='https://charter-hub-1.preview.emergentagent.com', help='Frontend URL to test')
+@click.option('--url', default='https://flightdb-shift.preview.emergentagent.com', help='Frontend URL to test')
 def frontend(url):
     """Test frontend accessibility"""
     async def test_frontend():
@@ -374,8 +374,8 @@ def info():
     """Show configuration information"""
     click.echo("ℹ️  SkyRide Configuration Information")
     click.echo("=" * 40)
-    click.echo(f"API Base URL: https://charter-hub-1.preview.emergentagent.com/api")
-    click.echo(f"Frontend URL: https://charter-hub-1.preview.emergentagent.com")
+    click.echo(f"API Base URL: https://flightdb-shift.preview.emergentagent.com/api")
+    click.echo(f"Frontend URL: https://flightdb-shift.preview.emergentagent.com")
     click.echo(f"DRY_RUN Mode: {os.getenv('DRY_RUN', 'true')}")
     click.echo(f"Wompi Environment: {os.getenv('WOMPI_ENV', 'test')}")
     

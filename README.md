@@ -31,10 +31,10 @@ A comprehensive charter flight booking platform with marketplace functionality, 
 ### Test the Platform
 ```bash
 # Health check
-curl https://charter-hub-1.preview.emergentagent.com/api/health
+curl https://flightdb-shift.preview.emergentagent.com/api/health
 
 # Test listings
-curl https://charter-hub-1.preview.emergentagent.com/api/listings
+curl https://flightdb-shift.preview.emergentagent.com/api/listings
 ```
 
 ## 📊 Sample Data Included
