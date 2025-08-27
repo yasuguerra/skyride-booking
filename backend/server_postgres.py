@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -18,11 +18,12 @@ import requests
 import hashlib
 import hmac
 from pathlib import Path
+import aiohttp
 
 # Import our models and database setup
 from database import database, get_db, engine, Base
 from models import *
-import pricing.quoting as quoting_engine
+from pricing import quoting
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
