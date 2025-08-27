@@ -126,21 +126,21 @@ const HomePage = () => {
         </div>
       </header>
 
-      {/* Hero Section with Search */}
-      <section className="py-16 px-4">
+      {/* Sky Ride Hero Section with Search */}
+      <section className="py-16 px-4 bg-gradient-to-b from-sr-primary-light to-white">
         <div className="container mx-auto max-w-4xl text-center">
-          <h2 className="text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-5xl font-sr font-bold text-sr-primary mb-6">
             Charter Your Next
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent block">
+            <span className="text-sr-accent block">
               Adventure
             </span>
           </h2>
-          <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto font-sr">
             Experience premium private aviation with transparent pricing, instant quotes, and guaranteed availability.
           </p>
 
           {/* Search Form */}
-          <Card className="p-6 bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-xl">
+          <Card className="card p-6 bg-white shadow-sr border-0">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div className="space-y-2">
                 <Label htmlFor="origin">From</Label>
