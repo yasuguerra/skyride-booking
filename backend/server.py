@@ -19,6 +19,9 @@ from enum import Enum
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Payment Integrations - PRODUCTION READY (no more DRY_RUN by default)
+PAYMENTS_DRY_RUN = os.getenv('PAYMENTS_DRY_RUN', 'false').lower() == 'true'  # Only true for staging
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
