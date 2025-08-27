@@ -58,20 +58,20 @@ const AdminDashboard = () => {
   };
 
   const StatCard = ({ title, value, icon: Icon, description, trend }) => (
-    <Card>
+    <Card className="card bg-white shadow-sr">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-sm font-sr font-medium text-sr-primary">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-sr-accent" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-2xl font-sr font-bold text-sr-primary">{value}</div>
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <p className="text-xs text-gray-600 font-sr mt-1">{description}</p>
         )}
         {trend && (
           <div className="flex items-center mt-2 text-xs">
             <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-            <span className="text-green-500">{trend}</span>
+            <span className="text-green-500 font-sr">{trend}</span>
           </div>
         )}
       </CardContent>
@@ -80,11 +80,11 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
+      <div className="min-h-screen bg-gray-50 p-8">
         <div className="container mx-auto max-w-7xl">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading dashboard...</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sr-accent"></div>
+            <span className="ml-3 text-gray-600 font-sr">Loading dashboard...</span>
           </div>
         </div>
       </div>
@@ -92,22 +92,23 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-8">
       <div className="container mx-auto max-w-7xl">
         
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">SkyRide Admin</h1>
-            <p className="text-gray-600 mt-1">Charter Operations Dashboard</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Platform Active
-            </Badge>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
+        {/* Sky Ride Admin Header */}
+        <div className="sr-admin-header bg-sr-primary text-white p-6 rounded-sr mb-8 shadow-sr">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-sr font-bold">SkyRide Admin</h1>
+              <p className="text-sr-accent-light mt-1 font-sr">Portal Operador - Charter Operations Dashboard</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Badge className="bg-green-100 text-green-700 border-green-200 font-sr">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Platform Active
+              </Badge>
+              <Button variant="outline" size="sm" className="border-white text-white hover:bg-white hover:text-sr-primary">
+                <Settings className="h-4 w-4 mr-2" />
               Settings
             </Button>
           </div>
