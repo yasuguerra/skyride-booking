@@ -238,18 +238,18 @@ const HomePage = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.map((listing) => (
-                <Card key={listing.id} className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm">
+                <Card key={listing.id} className="card group hover:shadow-sr transition-all duration-300 border-0 bg-white">
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-lg text-gray-900">{listing.aircraft?.model}</CardTitle>
-                        <CardDescription className="flex items-center mt-1">
-                          <MapPin className="h-4 w-4 mr-1" />
+                        <CardTitle className="text-lg font-sr font-semibold text-sr-primary">{listing.aircraft?.model}</CardTitle>
+                        <CardDescription className="flex items-center mt-1 text-gray-600 font-sr">
+                          <MapPin className="h-4 w-4 mr-1 text-sr-accent" />
                           {listing.route?.origin} → {listing.route?.destination}
                         </CardDescription>
                       </div>
                       {listing.featured && (
-                        <Badge className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white">
+                        <Badge className="badge-accent bg-sr-accent text-white">
                           <Star className="h-3 w-3 mr-1" />
                           Featured
                         </Badge>
