@@ -360,7 +360,7 @@ class Booking(Base):
     # Metadata
     notes = Column(Text, nullable=True)
     internal_notes = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    booking_metadata = Column(JSON, nullable=True)  # Changed from 'metadata'
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
