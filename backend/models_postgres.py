@@ -440,7 +440,7 @@ class MessageLog(Base):
     booking_id = Column(UUID(as_uuid=True), nullable=True)
     
     # Metadata
-    metadata = Column(JSON, nullable=True)
+    message_metadata = Column(JSON, nullable=True)  # Changed from 'metadata'
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
