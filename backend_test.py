@@ -64,7 +64,7 @@ class SkyRideAPITester:
             return False, 0, str(e)
 
     def test_health_endpoint(self):
-        """Test /api/health endpoint"""
+        """Test /api/health endpoint - PostgreSQL version"""
         success, status_code, data = self.make_request('GET', '/health')
         
         if not success:
@@ -72,14 +72,33 @@ class SkyRideAPITester:
             return False
 
         if status_code == 200:
-            expected_keys = ['status', 'features', 'dry_run']
-            has_all_keys = all(key in data for key in expected_keys)
-            
-            if has_all_keys and data.get('status') == 'ok':
-                self.log_test("Health Check", True, f"Status: {data.get('status')}, DRY_RUN: {data.get('dry_run')}")
+            # Check for PostgreSQL migration completion
+            if data.get('status') == 'ok':
+                db_type = data.get('database_type', '')
+                migration_status = data.get('postgresql_migration', '')
+                payments_dry_run = data.get('payments_dry_run', True)
+                
+                # Verify PostgreSQL migration is complete
+                if 'PostgreSQL' in db_type and migration_status == 'complete':
+                    self.log_test("PostgreSQL Migration", True, f"Database: {db_type}, Migration: {migration_status}")
+                else:
+                    self.log_test("PostgreSQL Migration", False, f"Database: {db_type}, Migration: {migration_status}")
+                
+                # Check integrations
+                integrations = data.get('integrations', {})
+                wompi_status = integrations.get('wompi', 'unknown')
+                chatrace_status = integrations.get('chatrace', 'unknown')
+                redis_status = integrations.get('redis_locks', 'unknown')
+                
+                self.log_test("Wompi Integration", wompi_status == 'production_ready', f"Status: {wompi_status}")
+                self.log_test("Chatrace Integration", chatrace_status == 'production_ready', f"Status: {chatrace_status}")
+                self.log_test("Redis Locks", redis_status == 'ready', f"Status: {redis_status}")
+                self.log_test("Payments DRY_RUN", not payments_dry_run, f"DRY_RUN: {payments_dry_run} (should be false for production)")
+                
+                self.log_test("Health Check", True, f"Status: {data.get('status')}, Version: {data.get('version')}")
                 return True
             else:
-                self.log_test("Health Check", False, f"Missing expected keys or wrong status", data)
+                self.log_test("Health Check", False, f"Status not OK: {data.get('status')}", data)
                 return False
         else:
             self.log_test("Health Check", False, f"Expected 200, got {status_code}", data)
