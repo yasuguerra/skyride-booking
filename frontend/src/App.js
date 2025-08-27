@@ -93,24 +93,34 @@ const HomePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50">
+    <div className="min-h-screen bg-gray-50">
+      {/* Sky Ride Branded Header */}
+      <header className="sr-navbar sticky bg-white border-b border-gray-200 shadow-sr-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-2 rounded-lg">
-                <Plane className="h-6 w-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                SkyRide
+            <div className="flex items-center space-x-3">
+              <img 
+                src="/brand/wordmark.svg" 
+                alt="Sky Ride" 
+                className="h-6 w-auto"
+                onError={(e) => {
+                  // Fallback to text if SVG fails
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+              />
+              <h1 className="text-2xl font-sr font-bold text-sr-primary hidden">
+                Sky Ride
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <Badge className="bg-sr-primary-light text-sr-primary border-sr-primary">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Live Platform
               </Badge>
+              <Button className="btn-primary bg-sr-primary hover:bg-sr-accent text-white rounded-sr">
+                Cotiza ahora
+              </Button>
             </div>
           </div>
         </div>
