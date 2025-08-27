@@ -295,31 +295,50 @@ async def import_aircraft(file: UploadFile = File(...)):
                 
                 operator_id = str(operator_result['id'])
                 
-                # Upsert aircraft
+                # Upsert aircraft - simplified approach
                 aircraft_id = str(uuid.uuid4())
-                aircraft_upsert = """
-                INSERT INTO aircraft (id, operator_id, name, type, seats, pets_allowed, ground_time_price_usd, product_link, created_at, updated_at)
-                VALUES (:id, :operator_id, :name, :type, :seats, :pets_allowed, :ground_time_price_usd, :product_link, :created_at, :updated_at)
-                ON CONFLICT (operator_id, name) DO UPDATE SET
-                    type = EXCLUDED.type,
-                    seats = EXCLUDED.seats,
-                    pets_allowed = EXCLUDED.pets_allowed,
-                    ground_time_price_usd = EXCLUDED.ground_time_price_usd,
-                    product_link = EXCLUDED.product_link,
-                    updated_at = EXCLUDED.updated_at
-                """
-                await database.execute(aircraft_upsert, {
-                    "id": aircraft_id,
-                    "operator_id": operator_id,
-                    "name": aircraft_name,
-                    "type": aircraft_type,
-                    "seats": int(capacity),
-                    "pets_allowed": pets_allowed,
-                    "ground_time_price_usd": ground_time_price,
-                    "product_link": product_link,
-                    "created_at": datetime.now(timezone.utc),
-                    "updated_at": datetime.now(timezone.utc)
-                })
+                
+                # Check if aircraft exists
+                existing_aircraft = await database.fetch_one(
+                    "SELECT id FROM aircraft WHERE operator_id = :operator_id AND name = :name",
+                    {"operator_id": operator_id, "name": aircraft_name}
+                )
+                
+                if existing_aircraft:
+                    # Update existing aircraft
+                    aircraft_update = """
+                    UPDATE aircraft SET type = :type, seats = :seats, pets_allowed = :pets_allowed,
+                           ground_time_price_usd = :ground_time_price_usd, product_link = :product_link, updated_at = :updated_at
+                    WHERE operator_id = :operator_id AND name = :name
+                    """
+                    await database.execute(aircraft_update, {
+                        "operator_id": operator_id,
+                        "name": aircraft_name,
+                        "type": aircraft_type,
+                        "seats": int(capacity),
+                        "pets_allowed": pets_allowed,
+                        "ground_time_price_usd": ground_time_price,
+                        "product_link": product_link,
+                        "updated_at": datetime.now(timezone.utc)
+                    })
+                else:
+                    # Insert new aircraft
+                    aircraft_insert = """
+                    INSERT INTO aircraft (id, operator_id, name, type, seats, pets_allowed, ground_time_price_usd, product_link, created_at, updated_at)
+                    VALUES (:id, :operator_id, :name, :type, :seats, :pets_allowed, :ground_time_price_usd, :product_link, :created_at, :updated_at)
+                    """
+                    await database.execute(aircraft_insert, {
+                        "id": aircraft_id,
+                        "operator_id": operator_id,
+                        "name": aircraft_name,
+                        "type": aircraft_type,
+                        "seats": int(capacity),
+                        "pets_allowed": pets_allowed,
+                        "ground_time_price_usd": ground_time_price,
+                        "product_link": product_link,
+                        "created_at": datetime.now(timezone.utc),
+                        "updated_at": datetime.now(timezone.utc)
+                    })
                 
                 success_count += 1
                 
