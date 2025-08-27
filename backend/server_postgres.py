@@ -193,26 +193,43 @@ async def import_operators(file: UploadFile = File(...)):
                     else:
                         base_airport_id = str(airport_result['id'])
                 
-                # Upsert operator
+                # Upsert operator - use INSERT without ON CONFLICT for MVP
                 operator_id = str(uuid.uuid4())
-                operator_upsert = """
-                INSERT INTO operators (id, name, email, phone, base_airport_id, created_at, updated_at)
-                VALUES (:id, :name, :email, :phone, :base_airport_id, :created_at, :updated_at)
-                ON CONFLICT (name) DO UPDATE SET
-                    email = EXCLUDED.email,
-                    phone = EXCLUDED.phone,
-                    base_airport_id = EXCLUDED.base_airport_id,
-                    updated_at = EXCLUDED.updated_at
-                """
-                await database.execute(operator_upsert, {
-                    "id": operator_id,
-                    "name": operator_name,
-                    "email": email,
-                    "phone": phone,
-                    "base_airport_id": base_airport_id,
-                    "created_at": datetime.now(timezone.utc),
-                    "updated_at": datetime.now(timezone.utc)
-                })
+                
+                # Check if operator exists first
+                existing_operator = await database.fetch_one(
+                    "SELECT id FROM operators WHERE name = :name",
+                    {"name": operator_name}
+                )
+                
+                if existing_operator:
+                    # Update existing operator
+                    operator_update = """
+                    UPDATE operators SET email = :email, phone = :phone, base_airport_id = :base_airport_id, updated_at = :updated_at
+                    WHERE name = :name
+                    """
+                    await database.execute(operator_update, {
+                        "name": operator_name,
+                        "email": email,
+                        "phone": phone,
+                        "base_airport_id": base_airport_id,
+                        "updated_at": datetime.now(timezone.utc)
+                    })
+                else:
+                    # Insert new operator
+                    operator_insert = """
+                    INSERT INTO operators (id, name, email, phone, base_airport_id, created_at, updated_at)
+                    VALUES (:id, :name, :email, :phone, :base_airport_id, :created_at, :updated_at)
+                    """
+                    await database.execute(operator_insert, {
+                        "id": operator_id,
+                        "name": operator_name,
+                        "email": email,
+                        "phone": phone,
+                        "base_airport_id": base_airport_id,
+                        "created_at": datetime.now(timezone.utc),
+                        "updated_at": datetime.now(timezone.utc)
+                    })
                 
                 success_count += 1
                 
