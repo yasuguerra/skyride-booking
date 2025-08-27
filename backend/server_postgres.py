@@ -512,25 +512,49 @@ async def import_flights(file: UploadFile = File(...)):
                 if price_without_itbms > 0 and route_id:
                     origin_result = await database.fetch_one("SELECT origin_id, destination_id FROM routes WHERE id = :id", {"id": route_id})
                     if origin_result:
-                        pricebook_id = str(uuid.uuid4())
-                        pricebook_insert = """
-                        INSERT INTO pricebook (id, operator_id, aircraft_type, origin_id, destination_id, base_price, currency, created_at)
-                        VALUES (:id, :operator_id, :aircraft_type, :origin_id, :destination_id, :base_price, :currency, :created_at)
-                        ON CONFLICT (operator_id, aircraft_type, origin_id, destination_id) DO UPDATE SET
-                            base_price = EXCLUDED.base_price,
-                            updated_at = :updated_at
-                        """
-                        await database.execute(pricebook_insert, {
-                            "id": pricebook_id,
+                        # Check if pricebook entry exists
+                        existing_pricebook = await database.fetch_one("""
+                        SELECT id FROM pricebook 
+                        WHERE operator_id = :operator_id AND aircraft_type = :aircraft_type 
+                        AND origin_id = :origin_id AND destination_id = :destination_id
+                        """, {
                             "operator_id": operator_id_found,
                             "aircraft_type": aircraft_type,
                             "origin_id": str(origin_result['origin_id']),
-                            "destination_id": str(origin_result['destination_id']),
-                            "base_price": price_without_itbms,
-                            "currency": "USD",
-                            "created_at": datetime.now(timezone.utc),
-                            "updated_at": datetime.now(timezone.utc)
+                            "destination_id": str(origin_result['destination_id'])
                         })
+                        
+                        if not existing_pricebook:
+                            pricebook_id = str(uuid.uuid4())
+                            pricebook_insert = """
+                            INSERT INTO pricebook (id, operator_id, aircraft_type, origin_id, destination_id, base_price, currency, created_at)
+                            VALUES (:id, :operator_id, :aircraft_type, :origin_id, :destination_id, :base_price, :currency, :created_at)
+                            """
+                            await database.execute(pricebook_insert, {
+                                "id": pricebook_id,
+                                "operator_id": operator_id_found,
+                                "aircraft_type": aircraft_type,
+                                "origin_id": str(origin_result['origin_id']),
+                                "destination_id": str(origin_result['destination_id']),
+                                "base_price": price_without_itbms,
+                                "currency": "USD",
+                                "created_at": datetime.now(timezone.utc)
+                            })
+                        else:
+                            # Update existing pricebook entry
+                            pricebook_update = """
+                            UPDATE pricebook SET base_price = :base_price, updated_at = :updated_at
+                            WHERE operator_id = :operator_id AND aircraft_type = :aircraft_type 
+                            AND origin_id = :origin_id AND destination_id = :destination_id
+                            """
+                            await database.execute(pricebook_update, {
+                                "operator_id": operator_id_found,
+                                "aircraft_type": aircraft_type,
+                                "origin_id": str(origin_result['origin_id']),
+                                "destination_id": str(origin_result['destination_id']),
+                                "base_price": price_without_itbms,
+                                "updated_at": datetime.now(timezone.utc)
+                            })
                 
                 success_count += 1
                 
