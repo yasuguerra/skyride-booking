@@ -1,9 +1,30 @@
-/* SkyRide WordPress Blocks Styles */
+/* 
+ * SkyRide WordPress Blocks Styles
+ * Official brand colors and design tokens implementation
+ * Brand Manual Compliant - Colors: Primary #152c46, Accent #4670b5
+ * Typography: Open Sans (web-safe fallbacks included)
+ */
+
+/* Import Open Sans for WordPress blocks */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Sky Ride Brand Tokens for WordPress */
+:root {
+  --sr-color-primary: #152c46;
+  --sr-color-accent: #4670b5; 
+  --sr-color-black: #000000;
+  --sr-color-primary-light: rgba(21, 44, 70, 0.1);
+  --sr-color-accent-light: rgba(70, 112, 181, 0.1);
+  --sr-radius: 16px;
+  --sr-shadow: 0 8px 24px rgba(21, 44, 70, 0.15);
+  --sr-font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
+}
 
 /* Quote CTA Block */
 .skyride-quote-cta {
     margin: 20px 0;
     text-align: center;
+    font-family: var(--sr-font-family);
 }
 
 .skyride-cta-button {
@@ -11,61 +32,61 @@
     padding: 15px 30px;
     font-size: 18px;
     font-weight: 600;
+    font-family: var(--sr-font-family);
     text-decoration: none;
-    border-radius: 8px;
+    border-radius: var(--sr-radius);
     transition: all 0.3s ease;
     cursor: pointer;
     border: none;
-    font-family: inherit;
+    box-shadow: var(--sr-shadow);
 }
 
 .skyride-cta-primary {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    background: var(--sr-color-primary);
     color: white;
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 .skyride-cta-primary:hover {
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    background: var(--sr-color-accent);
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
     color: white;
     text-decoration: none;
 }
 
 .skyride-cta-secondary {
-    background: #f8fafc;
-    color: #1e293b;
-    border: 2px solid #e2e8f0;
+    background: white;
+    color: var(--sr-color-primary);
+    border: 2px solid var(--sr-color-primary);
 }
 
 .skyride-cta-secondary:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-    color: #1e293b;
+    background: var(--sr-color-primary);
+    color: white;
     text-decoration: none;
 }
 
 /* Quote Embed */
 .skyride-quote-embed {
     margin: 20px 0;
-    border-radius: 12px;
+    border-radius: var(--sr-radius);
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--sr-shadow);
 }
 
 /* Hot Deals Block */
 .skyride-hot-deals {
     margin: 30px 0;
     padding: 20px;
-    background: #f8fafc;
-    border-radius: 12px;
+    background: var(--sr-color-primary-light);
+    border-radius: var(--sr-radius);
+    font-family: var(--sr-font-family);
 }
 
 .skyride-deals-title {
     font-size: 24px;
     font-weight: 700;
-    color: #1e293b;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-primary);
     margin-bottom: 20px;
     text-align: center;
 }
