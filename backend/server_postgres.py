@@ -412,17 +412,19 @@ async def import_flights(file: UploadFile = File(...)):
                             airport_insert = """
                             INSERT INTO airports (id, code, name, city, country, timezone, created_at)
                             VALUES (:id, :code, :name, :city, :country, :timezone, :created_at)
-                            ON CONFLICT (code) DO NOTHING
                             """
-                            await database.execute(airport_insert, {
-                                "id": airport_id,
-                                "code": airport_code,
-                                "name": airport_name,
-                                "city": "Unknown",
-                                "country": "PA",
-                                "timezone": "America/Panama",
-                                "created_at": datetime.now(timezone.utc)
-                            })
+                            # Check if airport exists to avoid duplicates
+                            existing_airport = await database.fetch_one("SELECT id FROM airports WHERE code = :code", {"code": airport_code})
+                            if not existing_airport:
+                                await database.execute(airport_insert, {
+                                    "id": airport_id,
+                                    "code": airport_code,
+                                    "name": airport_name,
+                                    "city": "Unknown",
+                                    "country": "PA",
+                                    "timezone": "America/Panama",
+                                    "created_at": datetime.now(timezone.utc)
+                                })
                     
                     # Create/find route
                     route_query = """
