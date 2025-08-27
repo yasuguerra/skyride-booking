@@ -743,7 +743,7 @@ async def create_quote(quote_request: QuoteRequest):
     """Create a quote using the real pricing engine"""
     try:
         # Calculate quote using pricing engine
-        pricing_result = await quoting_engine.calculate_quote(
+        pricing_result = await quoting.calculate_quote(
             listing_id=quote_request.listing_id,
             passengers=quote_request.passengers,
             departure_date=quote_request.departure_date,
