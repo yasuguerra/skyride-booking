@@ -57,16 +57,13 @@ logger = logging.getLogger(__name__)
 async def startup():
     await database.connect()
     global redis_client
-    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
-    redis_client = aioredis.from_url(redis_url, decode_responses=True)
-    logger.info("Database and Redis connected")
+    redis_client = {}  # Use a simple dict for now instead of Redis
+    logger.info("Database connected")
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
-    if redis_client:
-        await redis_client.close()
-    logger.info("Database and Redis disconnected")
+    logger.info("Database disconnected")
 
 # Utility functions
 def parse_flight_title(flight_title: str) -> tuple[Optional[str], Optional[str]]:
