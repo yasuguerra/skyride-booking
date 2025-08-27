@@ -1,0 +1,11 @@
+origin_code,destination_code,duration_min,distance_km,notes
+PTY,BOC,45,200,Popular tourist route to Bocas del Toro
+PTY,CHX,60,180,Charter to Changuinola region
+PTY,DAV,55,250,Business route to David
+PTY,PAC,15,25,Short domestic transfer
+BOC,CHX,20,45,Inter-island connection
+DAV,SYP,30,80,Western Panama connection
+PTY,RIH,90,150,Eastern Panama route
+CTD,PTY,35,120,Return from Chitré
+ONX,PTY,25,90,Colón to capital transfer
+BLB,PTY,10,15,Balboa Harbor connection
