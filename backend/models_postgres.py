@@ -4,12 +4,19 @@ Equivalent to MongoDB collections with proper relationships
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, ForeignKey, Index, JSON, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import uuid
 import enum
 from database_postgres import Base
+
+# Use JSON for arrays in SQLite compatibility
+def array_column():
+    return JSON
+
+# Use String for UUID in SQLite compatibility  
+def uuid_column():
+    return String(36)
 
 # Enums
 class ListingType(str, enum.Enum):
@@ -87,7 +94,7 @@ class SlotSource(str, enum.Enum):
 class Operator(Base):
     __tablename__ = "operators"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     code = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), nullable=False)
@@ -122,13 +129,13 @@ class Operator(Base):
 class Aircraft(Base):
     __tablename__ = "aircraft"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    operator_id = Column(UUID(as_uuid=True), ForeignKey("operators.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    operator_id = Column(String(36), ForeignKey("operators.id"), nullable=False)
     model = Column(String(255), nullable=False)
     registration = Column(String(50), unique=True, nullable=False, index=True)
     capacity = Column(Integer, nullable=False)
     hourly_rate = Column(Float, nullable=True)
-    images = Column(ARRAY(String), default=[])
+    images = Column(JSON, default=lambda: [])
     active = Column(Boolean, default=True, nullable=False)
     
     # ICS Calendar import (optional)
@@ -152,7 +159,7 @@ class Aircraft(Base):
 class Route(Base):
     __tablename__ = "routes"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     origin = Column(String(255), nullable=False, index=True)
     destination = Column(String(255), nullable=False, index=True)
     distance = Column(Float, nullable=True)  # nautical miles
@@ -172,10 +179,10 @@ class Route(Base):
 class Listing(Base):
     __tablename__ = "listings"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    operator_id = Column(UUID(as_uuid=True), ForeignKey("operators.id"), nullable=False)
-    aircraft_id = Column(UUID(as_uuid=True), ForeignKey("aircraft.id"), nullable=False)
-    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    operator_id = Column(String(36), ForeignKey("operators.id"), nullable=False)
+    aircraft_id = Column(String(36), ForeignKey("aircraft.id"), nullable=False)
+    route_id = Column(String(36), ForeignKey("routes.id"), nullable=False)
     
     type = Column(SQLEnum(ListingType), default=ListingType.CHARTER, nullable=False)
     status = Column(SQLEnum(ListingStatus), default=ListingStatus.ACTIVE, nullable=False)
@@ -202,8 +209,8 @@ class Listing(Base):
     # Metadata
     title = Column(String(500), nullable=True)
     description = Column(Text, nullable=True)
-    amenities = Column(ARRAY(String), default=[])
-    images = Column(ARRAY(String), default=[])
+    amenities = Column(JSON, default=lambda: [])
+    images = Column(JSON, default=lambda: [])
     featured = Column(Boolean, default=False, nullable=False)
     boosted = Column(Boolean, default=False, nullable=False)
     
@@ -225,7 +232,7 @@ class Listing(Base):
 class Customer(Base):
     __tablename__ = "customers"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False, index=True)
     phone = Column(String(50), nullable=True)
     
@@ -265,10 +272,10 @@ class Customer(Base):
 class Quote(Base):
     __tablename__ = "quotes"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     token = Column(String(100), unique=True, nullable=False, index=True)
-    listing_id = Column(UUID(as_uuid=True), ForeignKey("listings.id"), nullable=False)
-    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True)
+    listing_id = Column(String(36), ForeignKey("listings.id"), nullable=False)
+    customer_id = Column(String(36), ForeignKey("customers.id"), nullable=True)
     
     # Quote details
     passengers = Column(Integer, nullable=False)
@@ -308,8 +315,8 @@ class Quote(Base):
 class Hold(Base):
     __tablename__ = "holds"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    quote_id = Column(UUID(as_uuid=True), ForeignKey("quotes.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    quote_id = Column(String(36), ForeignKey("quotes.id"), nullable=False)
     
     # Hold details
     deposit_amount = Column(Float, nullable=True)
@@ -335,11 +342,11 @@ class Hold(Base):
 class Booking(Base):
     __tablename__ = "bookings"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    quote_id = Column(UUID(as_uuid=True), ForeignKey("quotes.id"), nullable=False)
-    operator_id = Column(UUID(as_uuid=True), ForeignKey("operators.id"), nullable=False)
-    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True)
-    hold_id = Column(UUID(as_uuid=True), ForeignKey("holds.id"), nullable=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    quote_id = Column(String(36), ForeignKey("quotes.id"), nullable=False)
+    operator_id = Column(String(36), ForeignKey("operators.id"), nullable=False)
+    customer_id = Column(String(36), ForeignKey("customers.id"), nullable=True)
+    hold_id = Column(String(36), ForeignKey("holds.id"), nullable=True)
     
     # Booking details
     booking_number = Column(String(100), unique=True, nullable=False, index=True)
@@ -382,8 +389,8 @@ class Booking(Base):
 class Payment(Base):
     __tablename__ = "payments"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    booking_id = Column(String(36), ForeignKey("bookings.id"), nullable=False)
     
     # Payment details
     provider = Column(SQLEnum(PaymentProvider), nullable=False)
@@ -421,8 +428,8 @@ class Payment(Base):
 class MessageLog(Base):
     __tablename__ = "message_logs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    customer_id = Column(String(36), ForeignKey("customers.id"), nullable=True)
     
     # Message details
     channel = Column(SQLEnum(MessageChannel), nullable=False)
@@ -436,8 +443,8 @@ class MessageLog(Base):
     status = Column(SQLEnum(MessageStatus), default=MessageStatus.SENT, nullable=False)
     
     # Context
-    quote_id = Column(UUID(as_uuid=True), nullable=True)
-    booking_id = Column(UUID(as_uuid=True), nullable=True)
+    quote_id = Column(String(36), nullable=True)
+    booking_id = Column(String(36), nullable=True)
     
     # Metadata
     message_metadata = Column(JSON, nullable=True)  # Changed from 'metadata'
@@ -457,8 +464,8 @@ class MessageLog(Base):
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    payment_id = Column(UUID(as_uuid=True), ForeignKey("payments.id"), nullable=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    payment_id = Column(String(36), ForeignKey("payments.id"), nullable=True)
     
     # Webhook data
     event_type = Column(String(100), nullable=False, index=True)
@@ -487,17 +494,17 @@ class WebhookEvent(Base):
 class EventLog(Base):
     __tablename__ = "event_logs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # Event details
     event = Column(String(100), nullable=False, index=True)  # e.g., "quote_viewed", "hold_created"
     entity = Column(String(50), nullable=False)  # e.g., "quote", "booking"
-    entity_id = Column(UUID(as_uuid=True), nullable=False)
+    entity_id = Column(String(36), nullable=False)
     
     # Context
-    quote_id = Column(UUID(as_uuid=True), ForeignKey("quotes.id"), nullable=True)
-    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=True)
-    customer_id = Column(UUID(as_uuid=True), nullable=True)
+    quote_id = Column(String(36), ForeignKey("quotes.id"), nullable=True)
+    booking_id = Column(String(36), ForeignKey("bookings.id"), nullable=True)
+    customer_id = Column(String(36), nullable=True)
     
     # Event data
     data = Column(JSON, nullable=True)
@@ -522,8 +529,8 @@ class EventLog(Base):
 class AvailabilitySlot(Base):
     __tablename__ = "availability_slots"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    aircraft_id = Column(UUID(as_uuid=True), ForeignKey("aircraft.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    aircraft_id = Column(String(36), ForeignKey("aircraft.id"), nullable=False)
     
     # Slot details
     start_time = Column(DateTime(timezone=True), nullable=False)
@@ -550,8 +557,8 @@ class AvailabilitySlot(Base):
 class BusyBlock(Base):
     __tablename__ = "busy_blocks"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    aircraft_id = Column(UUID(as_uuid=True), ForeignKey("aircraft.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    aircraft_id = Column(String(36), ForeignKey("aircraft.id"), nullable=False)
     
     # Block details
     start_time = Column(DateTime(timezone=True), nullable=False)
@@ -579,7 +586,7 @@ class BusyBlock(Base):
 class PriceBook(Base):
     __tablename__ = "price_books"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     active = Column(Boolean, default=True, nullable=False)
@@ -602,8 +609,8 @@ class PriceBook(Base):
 class Surcharge(Base):
     __tablename__ = "surcharges"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    price_book_id = Column(UUID(as_uuid=True), ForeignKey("price_books.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    price_book_id = Column(String(36), ForeignKey("price_books.id"), nullable=False)
     
     # Surcharge details
     name = Column(String(255), nullable=False)
@@ -627,12 +634,12 @@ class Surcharge(Base):
 class PriceOverride(Base):
     __tablename__ = "price_overrides"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    price_book_id = Column(UUID(as_uuid=True), ForeignKey("price_books.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    price_book_id = Column(String(36), ForeignKey("price_books.id"), nullable=False)
     
     # Override details
-    aircraft_id = Column(UUID(as_uuid=True), ForeignKey("aircraft.id"), nullable=True)
-    route_id = Column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True)
+    aircraft_id = Column(String(36), ForeignKey("aircraft.id"), nullable=True)
+    route_id = Column(String(36), ForeignKey("routes.id"), nullable=True)
     override_price = Column(Float, nullable=False)
     
     # Effective dates
@@ -649,7 +656,7 @@ class PriceOverride(Base):
 class Policy(Base):
     __tablename__ = "policies"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     type = Column(String(50), nullable=False, index=True)  # "cancellation", "protection", "terms"
     content = Column(Text, nullable=False)  # HTML content
