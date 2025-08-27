@@ -1,0 +1,269 @@
+/**
+ * Sky Ride Brand Theme
+ * Official colors and design tokens according to brand manual
+ */
+
+:root {
+  /* Primary Brand Colors */
+  --sr-color-primary: #152c46;     /* Navy - RGB(21,44,70) */
+  --sr-color-accent: #4670b5;      /* Blue - RGB(70,112,181) */
+  --sr-color-black: #000000;       /* Corporate Black */
+  
+  /* Design Tokens */
+  --sr-radius: 16px;
+  --sr-shadow: 0 8px 24px rgba(21, 44, 70, 0.15);
+  
+  /* Typography */
+  --sr-font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  
+  /* Derived Colors */
+  --sr-color-primary-light: rgba(21, 44, 70, 0.1);
+  --sr-color-primary-dark: #0f1f31;
+  --sr-color-accent-light: rgba(70, 112, 181, 0.1);
+  --sr-color-accent-dark: #365a96;
+  
+  /* Status Colors (derived from primary) */
+  --sr-color-success: #22c55e;
+  --sr-color-warning: #f59e0b;
+  --sr-color-error: #ef4444;
+  
+  /* Neutral Colors */
+  --sr-color-gray-50: #f9fafb;
+  --sr-color-gray-100: #f3f4f6;
+  --sr-color-gray-200: #e5e7eb;
+  --sr-color-gray-300: #d1d5db;
+  --sr-color-gray-400: #9ca3af;
+  --sr-color-gray-500: #6b7280;
+  --sr-color-gray-600: #4b5563;
+  --sr-color-gray-700: #374151;
+  --sr-color-gray-800: #1f2937;
+  --sr-color-gray-900: #111827;
+}
+
+/* Base Typography */
+body {
+  font-family: var(--sr-font-family);
+  color: var(--sr-color-gray-900);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--sr-font-family);
+  font-weight: 600;
+}
+
+/* Button Styles */
+.btn-primary {
+  background-color: var(--sr-color-primary);
+  color: white;
+  border-radius: var(--sr-radius);
+  box-shadow: var(--sr-shadow);
+  border: none;
+  padding: 12px 24px;
+  font-family: var(--sr-font-family);
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--sr-color-accent);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--sr-color-primary);
+  border: 2px solid var(--sr-color-primary);
+  border-radius: var(--sr-radius);
+  padding: 10px 22px;
+  font-family: var(--sr-font-family);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--sr-color-primary);
+  color: white;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--sr-color-gray-600);
+  border: none;
+  border-radius: var(--sr-radius);
+  padding: 12px 24px;
+  font-family: var(--sr-font-family);
+  font-weight: 400;
+  transition: all 0.2s ease;
+}
+
+.btn-ghost:hover {
+  background-color: var(--sr-color-gray-100);
+  color: var(--sr-color-gray-900);
+}
+
+/* Card Styles */
+.card {
+  background: white;
+  border-radius: var(--sr-radius);
+  box-shadow: var(--sr-shadow);
+  border: none;
+  overflow: hidden;
+}
+
+/* Badge Styles */
+.badge-primary {
+  background-color: var(--sr-color-primary);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-accent {
+  background-color: var(--sr-color-accent);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Sky Ride Protection Badge */
+.sr-protection-badge {
+  background: linear-gradient(135deg, var(--sr-color-primary) 0%, var(--sr-color-accent) 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: var(--sr-radius);
+  font-weight: 600;
+  box-shadow: var(--sr-shadow);
+}
+
+/* Price Match Badge */
+.sr-pricematch-badge {
+  background-color: var(--sr-color-accent-light);
+  color: var(--sr-color-accent-dark);
+  border: 1px solid var(--sr-color-accent);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+/* Empty Leg Band */
+.sr-empty-leg-band {
+  background-color: var(--sr-color-accent);
+  color: white;
+  padding: 4px 12px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Timer Styles */
+.sr-timer {
+  background-color: var(--sr-color-primary-light);
+  border: 1px solid var(--sr-color-primary);
+  color: var(--sr-color-primary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+/* Navbar Styles */
+.sr-navbar {
+  background-color: white;
+  border-bottom: 1px solid var(--sr-color-gray-200);
+  box-shadow: 0 2px 8px rgba(21, 44, 70, 0.08);
+}
+
+.sr-navbar.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Admin Portal Header */
+.sr-admin-header {
+  background-color: var(--sr-color-primary);
+  color: white;
+}
+
+/* Checkout Styles */
+.sr-checkout-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--sr-color-gray-200);
+}
+
+.sr-service-fee {
+  color: var(--sr-color-accent);
+  font-weight: 500;
+}
+
+/* Hot Deals Card */
+.sr-hot-deals-card {
+  position: relative;
+  background: white;
+  border-radius: var(--sr-radius);
+  box-shadow: var(--sr-shadow);
+  overflow: hidden;
+  border: 2px solid var(--sr-color-accent-light);
+}
+
+.sr-hot-deals-card::before {
+  content: 'HOT DEAL';
+  position: absolute;
+  top: 12px;
+  right: -30px;
+  background-color: var(--sr-color-accent);
+  color: white;
+  padding: 4px 40px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transform: rotate(45deg);
+  z-index: 10;
+}
+
+/* WordPress Block Styles */
+.wp-block-skyride {
+  font-family: var(--sr-font-family);
+}
+
+.wp-block-skyride .card {
+  background: white;
+  border-radius: var(--sr-radius);
+  box-shadow: var(--sr-shadow);
+  padding: 20px;
+  margin: 16px 0;
+}
+
+/* Animation for buttons */
+@keyframes sr-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.btn-primary:active {
+  animation: sr-pulse 0.15s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  :root {
+    --sr-radius: 12px;
+    --sr-shadow: 0 4px 16px rgba(21, 44, 70, 0.12);
+  }
+  
+  .btn-primary, .btn-secondary {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+}
