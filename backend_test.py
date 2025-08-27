@@ -219,8 +219,8 @@ class SkyRideAPITester:
             self.log_test("Create Hold", False, f"Expected 200, got {status_code}", data)
             return None
 
-    def test_checkout_endpoint(self, quote_id: str):
-        """Test /api/checkout endpoint"""
+    def test_wompi_payment_integration(self, quote_id: str):
+        """Test Wompi payment link creation - PRODUCTION MODE"""
         checkout_data = {
             "orderId": quote_id,
             "provider": "WOMPI"
@@ -229,24 +229,118 @@ class SkyRideAPITester:
         success, status_code, data = self.make_request('POST', '/checkout', data=checkout_data)
         
         if not success:
-            self.log_test("Create Checkout", False, f"Request failed: {data}")
+            self.log_test("Wompi Payment Integration", False, f"Request failed: {data}")
             return None
 
-        # In DRY_RUN mode, we might get different responses
         if status_code == 200:
             if 'paymentLinkUrl' in data:
-                self.log_test("Create Checkout", True, f"Payment link created")
+                payment_url = data['paymentLinkUrl']
+                # Check if it's a real Wompi URL (not mock)
+                is_production = 'wompi.pa' in payment_url or 'wompi.co' in payment_url
+                is_mock = 'mock_' in payment_url
+                
+                if is_production and not is_mock:
+                    self.log_test("Wompi Payment Integration", True, f"Production payment link created: {payment_url[:50]}...")
+                elif is_mock:
+                    self.log_test("Wompi Payment Integration", False, f"Mock payment link detected (DRY_RUN mode): {payment_url}")
+                else:
+                    self.log_test("Wompi Payment Integration", True, f"Payment link created: {payment_url[:50]}...")
                 return data
             else:
-                self.log_test("Create Checkout", False, f"No payment link in response", data)
+                self.log_test("Wompi Payment Integration", False, f"No payment link in response", data)
                 return None
         elif status_code == 404:
-            # Expected if booking doesn't exist (we're using quote ID as order ID)
-            self.log_test("Create Checkout", True, f"Expected 404 for non-existent booking (using quote ID)")
+            # Expected if booking doesn't exist, try to create booking first
+            self.log_test("Wompi Payment Integration", False, f"Booking not found for quote ID: {quote_id}")
             return None
         else:
-            self.log_test("Create Checkout", False, f"Unexpected status {status_code}", data)
+            self.log_test("Wompi Payment Integration", False, f"Unexpected status {status_code}", data)
             return None
+
+    def test_whatsapp_template_integration(self):
+        """Test WhatsApp template sending via Chatrace"""
+        template_data = {
+            "template": "quote_created",
+            "to": "+507 6000-0000",
+            "params": {
+                "customer_name": "Test Customer",
+                "quote_amount": "2500",
+                "quote_link": "https://booking.skyride.city/q/test123"
+            }
+        }
+        
+        success, status_code, data = self.make_request('POST', '/wa/send-template', data=template_data)
+        
+        if not success:
+            self.log_test("WhatsApp Template Integration", False, f"Request failed: {data}")
+            return False
+
+        if status_code == 200:
+            if data.get('success') == True:
+                self.log_test("WhatsApp Template Integration", True, "Template sent successfully")
+                return True
+            else:
+                self.log_test("WhatsApp Template Integration", False, f"Template sending failed: {data}")
+                return False
+        else:
+            self.log_test("WhatsApp Template Integration", False, f"Expected 200, got {status_code}", data)
+            return False
+
+    def test_redis_hold_locks(self):
+        """Test Redis-based hold locks"""
+        # Test creating a Redis hold lock
+        hold_data = {
+            "listingId": "test-listing-123",
+            "holdDurationMinutes": 30
+        }
+        
+        success, status_code, data = self.make_request('POST', '/holds/redis-lock', params=hold_data)
+        
+        if not success:
+            self.log_test("Redis Hold Locks", False, f"Request failed: {data}")
+            return False
+
+        if status_code == 200:
+            if data.get('success') == True:
+                hold_key = data.get('holdKey', '')
+                duration = data.get('expiresInMinutes', 0)
+                self.log_test("Redis Hold Locks", True, f"Hold lock created: {hold_key}, Duration: {duration}min")
+                return True
+            else:
+                self.log_test("Redis Hold Locks", False, f"Hold lock creation failed: {data}")
+                return False
+        else:
+            self.log_test("Redis Hold Locks", False, f"Expected 200, got {status_code}", data)
+            return False
+
+    def test_postgresql_database_operations(self, listings):
+        """Test PostgreSQL database operations"""
+        if not listings or len(listings) == 0:
+            self.log_test("PostgreSQL Database Operations", False, "No listings available to test database operations")
+            return False
+        
+        # Test that listings have proper structure and data
+        first_listing = listings[0]
+        
+        # Check for UUID-style IDs (PostgreSQL typically uses UUIDs)
+        listing_id = first_listing.get('_id', '')
+        has_uuid_style = len(listing_id) >= 32 and '-' in listing_id
+        
+        # Check for proper data types and structure
+        has_prices = all(key in first_listing for key in ['basePrice', 'serviceFee', 'totalPrice'])
+        has_relations = all(key in first_listing for key in ['operator', 'aircraft', 'route'])
+        
+        if has_prices and has_relations:
+            self.log_test("PostgreSQL Database Operations", True, f"Database operations working, ID format: {'UUID-style' if has_uuid_style else 'Legacy'}")
+            return True
+        else:
+            missing = []
+            if not has_prices:
+                missing.append("pricing fields")
+            if not has_relations:
+                missing.append("relation fields")
+            self.log_test("PostgreSQL Database Operations", False, f"Missing: {', '.join(missing)}")
+            return False
 
     def run_all_tests(self):
         """Run comprehensive test suite"""
