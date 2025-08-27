@@ -127,58 +127,59 @@
     text-align: right;
 }
 
-/* Deal Card */
+/* Deal Card with Sky Ride branding */
 .skyride-deal-card {
     background: white;
-    border-radius: 12px;
+    border-radius: var(--sr-radius);
     overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--sr-shadow);
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
+    border: 2px solid var(--sr-color-accent-light);
+}
+
+/* Hot Deals Card with Empty Leg band */
+.skyride-deal-card.sr-hot-deals-card::before {
+    content: 'HOT DEAL';
+    position: absolute;
+    top: 12px;
+    right: -30px;
+    background: var(--sr-color-accent);
+    color: white;
+    padding: 4px 40px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--sr-font-family);
+    transform: rotate(45deg);
+    z-index: 10;
 }
 
 .skyride-deal-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-}
-
-/* Deal Image */
-.skyride-deal-image {
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-    position: relative;
-}
-
-.skyride-deal-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.skyride-deal-card:hover .skyride-deal-image img {
-    transform: scale(1.05);
+    box-shadow: 0 16px 40px rgba(21, 44, 70, 0.2);
 }
 
 /* Deal Content */
 .skyride-deal-content {
     padding: 20px;
+    font-family: var(--sr-font-family);
 }
 
 .skyride-deal-title {
     font-size: 18px;
     font-weight: 600;
-    color: #1e293b;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-primary);
     margin-bottom: 8px;
     line-height: 1.4;
 }
 
 .skyride-deal-route {
     font-size: 16px;
-    color: #3b82f6;
+    color: var(--sr-color-accent);
     font-weight: 500;
+    font-family: var(--sr-font-family);
     margin-bottom: 8px;
 }
 
@@ -186,6 +187,7 @@
 .skyride-deal-passengers {
     font-size: 14px;
     color: #64748b;
+    font-family: var(--sr-font-family);
     margin-bottom: 4px;
 }
 
@@ -206,28 +208,31 @@
 .skyride-price-amount {
     font-size: 24px;
     font-weight: 700;
-    color: #059669;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-accent);
 }
 
 .skyride-price-currency {
     font-size: 14px;
     color: #64748b;
     font-weight: 500;
+    font-family: var(--sr-font-family);
 }
 
 .skyride-deal-button {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    background: var(--sr-color-primary);
     color: white;
     padding: 10px 20px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
+    font-family: var(--sr-font-family);
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
 .skyride-deal-button:hover {
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    background: var(--sr-color-accent);
     transform: translateY(-1px);
     color: white;
     text-decoration: none;
