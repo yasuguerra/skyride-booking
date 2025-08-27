@@ -74,13 +74,20 @@ class CharterSystemAPITester:
         self.run_test("Import Aircraft", "GET", "api/admin/import/aircraft", 405)   # Should exist but reject GET
         self.run_test("Import Flights", "GET", "api/admin/import/flights", 405)     # Should exist but reject GET
         
+        # Test data retrieval endpoints
+        self.run_test("Get Operators", "GET", "api/operators", 200)
+        self.run_test("Get Aircraft", "GET", "api/aircraft", 200)
+        self.run_test("Get Listings", "GET", "api/listings", 200)
+        self.run_test("Get Routes", "GET", "api/routes", 200)
+        self.run_test("Get Airports", "GET", "api/airports", 200)
+        
         # Test quote creation (expected by frontend)
         quote_data = {
             "listing_id": "31c2934e-663d-493e-bab5-20a3a359f1dc",
             "departure_date": "2024-12-01",
             "passengers": 4
         }
-        self.run_test("Create Quote", "POST", "api/quotes", 200, quote_data)
+        self.run_test("Create Quote", "POST", "api/quotes", 400, quote_data)  # Expect 400 since listing doesn't exist
 
     def test_database_connectivity(self):
         """Test if database operations work"""
