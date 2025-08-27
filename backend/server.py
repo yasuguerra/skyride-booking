@@ -305,25 +305,28 @@ def parse_from_mongo(item):
     return item
 
 async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional[str]:
-    """Create Wompi Payment Link"""
-    if os.getenv('DRY_RUN', 'true').lower() == 'true':
-        # Return mock URL in DRY_RUN mode
+    """Create Wompi Payment Link - PRODUCTION VERSION"""
+    
+    if PAYMENTS_DRY_RUN:
+        # Return mock URL only in staging (DRY_RUN mode)
         return f"https://checkout.wompi.pa/l/mock_{booking.id[:8]}"
     
     try:
+        # PRODUCTION WOMPI INTEGRATION
         wompi_url = "https://api.wompi.co/v1/payment_links"
         headers = {
             "Authorization": f"Bearer {os.getenv('WOMPI_PRIVATE_KEY')}",
             "Content-Type": "application/json"
         }
         
+        # Create payment link with fixed amount
         payload = {
             "name": f"SkyRide Booking - {booking.bookingNumber}",
             "description": f"Charter flight booking #{booking.bookingNumber}",
             "single_use": True,
             "collect_shipping": False,
             "currency": "USD",
-            "amount_in_cents": int(amount * 100),
+            "amount_in_cents": int(amount * 100),  # Fixed amount in cents
             "redirect_url": f"{os.getenv('BASE_URL')}/success?booking={booking.id}",
             "metadata": {
                 "booking_id": booking.id,
@@ -331,11 +334,12 @@ async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional
             }
         }
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(wompi_url, headers=headers, json=payload)
             
             if response.status_code == 201:
                 data = response.json()
+                logger.info(f"✅ Wompi payment link created for booking {booking.bookingNumber}")
                 return data.get("data", {}).get("permalink")
             else:
                 logger.error(f"Wompi error: {response.status_code} - {response.text}")
