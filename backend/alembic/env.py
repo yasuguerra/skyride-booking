@@ -28,8 +28,8 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Set the database URL from environment
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+# Set the database URL from environment - use fallback for migration generation
+config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL_ALEMBIC", "sqlite:///./skyride_temp.db"))
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
