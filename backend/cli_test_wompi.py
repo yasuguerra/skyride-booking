@@ -321,8 +321,8 @@ def full():
         
         click.echo()
         
-        # Test checkout (use quote ID as order ID for demo)
-        payment_link = await tester.test_checkout(token)
+        # Test new features (availability, WordPress, analytics)
+        new_features_ok = await tester.test_new_features()
         
         click.echo()
         click.echo("📊 Test Summary:")
@@ -331,9 +331,9 @@ def full():
         click.echo(f"   Quote Creation: {'✅ PASS' if token else '❌ FAIL'}")
         click.echo(f"   Quote Retrieval: {'✅ PASS' if quote_ok else '❌ FAIL'}")
         click.echo(f"   Hold Creation: {'✅ PASS' if hold_id else '❌ FAIL'}")
-        click.echo(f"   Checkout: {'✅ PASS' if payment_link else '❌ FAIL'}")
+        click.echo(f"   New Features: {'✅ PASS' if new_features_ok else '❌ FAIL'}")
         
-        if all([health_ok, listing_id, token, quote_ok, hold_id, payment_link]):
+        if all([health_ok, listing_id, token, quote_ok, hold_id, new_features_ok]):
             click.echo("\n🎉 All tests passed! Platform is ready for use.")
         else:
             click.echo("\n⚠️  Some tests failed. Check configuration and try again.")
