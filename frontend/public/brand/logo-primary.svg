@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Sky Ride Logo - Primary Color Version -->
+  
+  <!-- Sky Icon (Cloud + Plane) -->
+  <g transform="translate(8, 8)">
+    <!-- Cloud -->
+    <path d="M6 16C3.79 16 2 14.21 2 12C2 9.79 3.79 8 6 8C6.35 8 6.69 8.06 7 8.17C7.6 6.36 9.18 5 11 5C13.21 5 15 6.79 15 9C15 9.35 14.94 9.69 14.83 10C16.28 10.19 17.4 11.42 17.4 12.9C17.4 14.5 16.1 15.8 14.5 15.8H6.2C6.13 15.93 6.07 16.07 6 16.2V16Z" fill="#152c46"/>
+    
+    <!-- Airplane -->
+    <path d="M10.5 3L12 4.5L10.5 6L9 4.5L10.5 3ZM16.5 9L18 10.5L16.5 12L15 10.5L16.5 9ZM4.5 9L6 10.5L4.5 12L3 10.5L4.5 9Z" fill="#4670b5"/>
+  </g>
+  
+  <!-- Text -->
+  <g transform="translate(32, 12)">
+    <text x="0" y="12" font-family="'Open Sans', sans-serif" font-weight="700" font-size="14" fill="#152c46">Sky Ride</text>
+  </g>
+  
+  <!-- Tagline -->
+  <g transform="translate(32, 28)">
+    <text x="0" y="6" font-family="'Open Sans', sans-serif" font-weight="400" font-size="8" fill="#4670b5">Charter Flight Marketplace</text>
+  </g>
+</svg>
