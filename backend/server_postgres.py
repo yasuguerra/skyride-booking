@@ -1721,6 +1721,63 @@ async def export_pricebook():
         headers={"Content-Disposition": "attachment; filename=pricebook_export.csv"}
     )
 
+# Data Retrieval Endpoints
+
+@api_router.get("/operators")
+async def get_operators():
+    """Get all operators"""
+    query = "SELECT * FROM operators ORDER BY name"
+    operators = await database.fetch_all(query)
+    return [dict(operator) for operator in operators]
+
+@api_router.get("/aircraft")
+async def get_aircraft():
+    """Get all aircraft"""
+    query = """
+    SELECT a.*, o.name as operator_name FROM aircraft a
+    LEFT JOIN operators o ON a.operator_id = o.id
+    ORDER BY a.name
+    """
+    aircraft = await database.fetch_all(query)
+    return [dict(aircraft_item) for aircraft_item in aircraft]
+
+@api_router.get("/listings")
+async def get_listings():
+    """Get all flight listings"""
+    query = """
+    SELECT l.*, o.name as operator_name, a.name as aircraft_name, a.type as aircraft_type,
+           orig.code as origin_code, dest.code as destination_code
+    FROM listings l
+    LEFT JOIN operators o ON l.operator_id = o.id
+    LEFT JOIN aircraft a ON l.aircraft_id = a.id
+    LEFT JOIN routes r ON l.route_id = r.id
+    LEFT JOIN airports orig ON r.origin_id = orig.id
+    LEFT JOIN airports dest ON r.destination_id = dest.id
+    ORDER BY l.title
+    """
+    listings = await database.fetch_all(query)
+    return [dict(listing) for listing in listings]
+
+@api_router.get("/routes")
+async def get_routes():
+    """Get all routes"""
+    query = """
+    SELECT r.*, orig.code as origin_code, dest.code as destination_code
+    FROM routes r
+    LEFT JOIN airports orig ON r.origin_id = orig.id
+    LEFT JOIN airports dest ON r.destination_id = dest.id
+    ORDER BY orig.code, dest.code
+    """
+    routes = await database.fetch_all(query)
+    return [dict(route) for route in routes]
+
+@api_router.get("/airports")
+async def get_airports():
+    """Get all airports"""
+    query = "SELECT * FROM airports ORDER BY code"
+    airports = await database.fetch_all(query)
+    return [dict(airport) for airport in airports]
+
 # Include the router
 app.include_router(api_router)
 
