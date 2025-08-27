@@ -790,14 +790,22 @@ async def n8n_notify(notify_data: N8NNotifyRequest):
 # Health Check
 @api_router.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint - Production Version"""
     return {
         "status": "ok",
+        "database_type": "MongoDB (migrating to PostgreSQL)",
         "features": {
             "empty_legs": os.getenv('EMPTY_LEGS_ENABLED', 'false').lower() == 'true',
             "yappy": os.getenv('YAPPY_ENABLED', 'false').lower() == 'true'
         },
-        "dry_run": os.getenv('DRY_RUN', 'true').lower() == 'true'
+        "payments_dry_run": PAYMENTS_DRY_RUN,
+        "integrations": {
+            "wompi": "production_ready" if not PAYMENTS_DRY_RUN else "staging",
+            "chatrace": "production_ready",
+            "redis_locks": "ready",
+            "postgresql_migration": "pending"
+        },
+        "version": "1.5.0"
     }
 
 # Include router
