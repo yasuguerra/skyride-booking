@@ -649,13 +649,13 @@ const Checkout = () => {
               <Button 
                 onClick={handleWompiCheckout}
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                className="btn-primary w-full bg-sr-primary hover:bg-sr-accent text-white rounded-sr font-sr font-semibold"
                 size="lg"
               >
                 {loading ? 'Processing...' : 'Pay with Wompi'}
               </Button>
               
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 font-sr">
                 Secure payment powered by Wompi Banistmo
               </p>
             </div>
