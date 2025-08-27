@@ -1,0 +1,7 @@
+name,operator,type,capacity,pets_allowed,ground_time_price_usd,product_link
+Cessna Citation X,Sky Ride Charter,Citation X,12,true,150,https://example.com/citation-x
+Beechcraft King Air 350,Aero Panama,King Air 350,9,false,120,https://example.com/king-air
+Piper Navajo,Central Air Charter,Piper PA-31,8,true,100,https://example.com/piper-navajo
+Cessna 208 Caravan,Bocas Aviation,Cessna 208,14,true,80,https://example.com/caravan
+DHC-6 Twin Otter,Pacific Wings,Twin Otter,19,false,90,https://example.com/twin-otter
+Embraer Phenom 300,Sky Ride Charter,Phenom 300,11,false,200,https://example.com/phenom-300

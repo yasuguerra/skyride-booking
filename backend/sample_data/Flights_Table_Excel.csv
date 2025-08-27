@@ -1,0 +1,7 @@
+id,flight_title,airplane_id,operator_id,flight_duration_min,full_flight_duration_min,refuel_time,price_without_itbms,itbms,total_price_one_way,total_price_round_trip,departure_days,max_load_weight_lbs,description
+1,PTY – BOC,Cessna Citation X,Sky Ride Charter,45,60,15,1200,84,1284,2400,Mon-Fri,2000,Daily charter flight from Panama City to Bocas del Toro
+2,PTY / CHX,Beechcraft King Air 350,Aero Panama,60,75,15,1500,105,1605,3000,Daily,1800,Charter service to Changuinola with stopover options
+3,DAV → PTY,Piper Navajo,Central Air Charter,55,70,15,900,63,963,1800,Mon-Sat,1600,Regular service from David to Panama City
+4,BOC – CHX,Cessna 208 Caravan,Bocas Aviation,20,25,5,400,28,428,800,Daily,2200,Inter-island shuttle service
+5,PTY → DAV,DHC-6 Twin Otter,Pacific Wings,55,65,10,1100,77,1177,2200,Tue-Sun,3500,Scenic route to David with coastal views
+6,PTY – RIH,Embraer Phenom 300,Sky Ride Charter,90,110,20,2200,154,2354,4400,On-demand,2500,Executive charter to eastern Panama
