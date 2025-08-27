@@ -300,7 +300,7 @@ class MongoToPostgresMigrator:
                 fully_paid_at=self._parse_datetime(doc.get('fullyPaidAt')),
                 notes=doc.get('notes'),
                 internal_notes=doc.get('internalNotes'),
-                metadata=doc.get('metadata'),
+                booking_metadata=doc.get('metadata'),  # Changed field name
                 created_at=self._parse_datetime(doc.get('createdAt')),
                 updated_at=self._parse_datetime(doc.get('updatedAt'))
             )
