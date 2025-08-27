@@ -626,25 +626,25 @@ const Checkout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-2xl">
-        <Card className="bg-white/90 backdrop-blur-sm">
+        <Card className="card bg-white shadow-sr">
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Complete Your Booking</CardTitle>
-            <CardDescription className="text-center">Order #{orderId}</CardDescription>
+            <CardTitle className="text-2xl text-center font-sr font-bold text-sr-primary">Complete Your Booking</CardTitle>
+            <CardDescription className="text-center font-sr">Order #{orderId}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-200 rounded-sr p-4">
                 <div className="flex items-center">
                   <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                  <p className="text-red-700">{error}</p>
+                  <p className="text-red-700 font-sr">{error}</p>
                 </div>
               </div>
             )}
             
             <div className="text-center space-y-4">
-              <p className="text-gray-600">Choose your payment method to complete the booking</p>
+              <p className="text-gray-600 font-sr">Choose your payment method to complete the booking</p>
               
               <Button 
                 onClick={handleWompiCheckout}
