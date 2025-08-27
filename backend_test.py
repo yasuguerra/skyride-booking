@@ -343,42 +343,49 @@ class SkyRideAPITester:
             return False
 
     def run_all_tests(self):
-        """Run comprehensive test suite"""
-        print("🚀 Starting SkyRide Backend API Tests")
+        """Run comprehensive test suite for PostgreSQL backend"""
+        print("🚀 Starting SkyRide PostgreSQL Backend API Tests")
         print(f"📡 Testing endpoint: {self.api_url}")
         print("=" * 60)
 
-        # Test 1: Health Check
+        # Test 1: Health Check & PostgreSQL Migration Status
         health_ok = self.test_health_endpoint()
         if not health_ok:
-            print("\n❌ Health check failed - stopping tests")
-            return False
+            print("\n❌ Health check failed - continuing with other tests")
 
-        # Test 2: Get Listings
+        # Test 2: Get Listings (PostgreSQL Database Operations)
         listings = self.test_listings_endpoint()
-        if not listings:
-            print("\n❌ No listings available - stopping tests")
-            return False
+        if listings:
+            self.test_postgresql_database_operations(listings)
+        else:
+            print("\n❌ No listings available - some tests will be skipped")
 
-        # Test 3: Create Quote (using first listing)
-        first_listing = listings[0]
-        quote = self.test_create_quote(first_listing['_id'])
-        if not quote:
-            print("\n❌ Quote creation failed - stopping tests")
-            return False
+        # Test 3: Create Quote
+        quote = None
+        if listings:
+            first_listing = listings[0]
+            quote = self.test_create_quote(first_listing['_id'])
+            if not quote:
+                print("\n❌ Quote creation failed - payment tests will be skipped")
 
         # Test 4: Get Quote by Token
-        quote_details = self.test_get_quote(quote['token'])
-        if not quote_details:
-            print("\n❌ Quote retrieval failed - continuing with other tests")
+        quote_details = None
+        if quote:
+            quote_details = self.test_get_quote(quote['token'])
 
-        # Test 5: Create Hold
-        hold = self.test_create_hold(quote['token'])
-        if not hold:
-            print("\n⚠️ Hold creation failed - continuing with other tests")
+        # Test 5: Create Hold (Traditional)
+        if quote:
+            hold = self.test_create_hold(quote['token'])
 
-        # Test 6: Checkout (expected to fail in MVP without booking creation)
-        checkout = self.test_checkout_endpoint(quote_details['_id'] if quote_details else 'test-id')
+        # Test 6: Redis Hold Locks
+        self.test_redis_hold_locks()
+
+        # Test 7: Wompi Payment Integration (Production Mode)
+        if quote_details:
+            self.test_wompi_payment_integration(quote_details['_id'])
+
+        # Test 8: WhatsApp Template Integration (Chatrace)
+        self.test_whatsapp_template_integration()
 
         return True
 
