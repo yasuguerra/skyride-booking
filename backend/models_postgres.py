@@ -14,9 +14,11 @@ from database_postgres import Base
 def array_column():
     return JSON
 
-# Use String for UUID in SQLite compatibility  
+
+# Use String for UUID in SQLite compatibility
 def uuid_column():
     return String(36)
+
 
 # Enums
 class ListingType(str, enum.Enum):
