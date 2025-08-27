@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 import os
 import logging
 import pandas as pd
-import redis
-import aioredis
 import json
 import uuid
 from datetime import datetime, timezone, timedelta
