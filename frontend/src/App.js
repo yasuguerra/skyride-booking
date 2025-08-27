@@ -500,20 +500,20 @@ const HostedQuote = () => {
                   </div>
                 </div>
 
-                {/* Pricing Breakdown */}
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <div className="flex justify-between">
-                    <span>Base Price</span>
-                    <span>${quote.basePrice.toLocaleString()}</span>
+                {/* Sky Ride Pricing Breakdown */}
+                <div className="bg-gray-50 p-4 rounded-sr space-y-2">
+                  <div className="sr-checkout-item">
+                    <span className="font-sr">Precio del vuelo</span>
+                    <span className="font-sr">${quote.basePrice.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Service Fee</span>
-                    <span>${quote.serviceFee.toLocaleString()}</span>
+                  <div className="sr-checkout-item">
+                    <span className="sr-service-fee font-sr font-medium">Service fee Sky Ride</span>
+                    <span className="sr-service-fee font-sr font-medium">${quote.serviceFee.toLocaleString()}</span>
                   </div>
                   <Separator />
-                  <div className="flex justify-between text-lg font-semibold">
-                    <span>Total Price</span>
-                    <span className="text-blue-600">${quote.totalPrice.toLocaleString()}</span>
+                  <div className="sr-checkout-item text-lg font-semibold">
+                    <span className="font-sr font-bold">Total Price</span>
+                    <span className="text-sr-accent font-sr font-bold">${quote.totalPrice.toLocaleString()}</span>
                   </div>
                 </div>
 
