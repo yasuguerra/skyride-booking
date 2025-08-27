@@ -452,14 +452,14 @@ const HostedQuote = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
+        {/* Sky Ride Header */}
         <div className="flex items-center justify-between mb-8">
-          <Button variant="outline" onClick={() => navigate('/')}>
+          <Button variant="outline" onClick={() => navigate('/')} className="btn-ghost">
             ← Back to Search
           </Button>
-          <Badge className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg px-4 py-2">
+          <Badge className="sr-timer bg-sr-primary-light text-sr-primary border border-sr-primary px-4 py-2 rounded-sr text-lg font-sr font-semibold">
             <Clock className="h-4 w-4 mr-2" />
             {timeLeft === 'EXPIRED' ? 'EXPIRED' : `Expires in: ${timeLeft}`}
           </Badge>
@@ -468,10 +468,10 @@ const HostedQuote = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Quote Details */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="bg-white/90 backdrop-blur-sm">
+            <Card className="card bg-white shadow-sr">
               <CardHeader>
-                <CardTitle className="text-2xl text-gray-900">Your Flight Quote</CardTitle>
-                <CardDescription>Quote #{quote.token}</CardDescription>
+                <CardTitle className="text-2xl font-sr font-bold text-sr-primary">Your Flight Quote</CardTitle>
+                <CardDescription className="font-sr">Quote #{quote.token}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Route & Aircraft */}
