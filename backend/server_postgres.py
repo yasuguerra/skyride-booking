@@ -735,6 +735,382 @@ async def health_check():
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
+# Quote Endpoints
+
+@api_router.post("/quotes", response_model=QuoteResponse)
+async def create_quote(quote_request: QuoteRequest):
+    """Create a quote using the real pricing engine"""
+    try:
+        # Calculate quote using pricing engine
+        pricing_result = await quoting_engine.calculate_quote(
+            listing_id=quote_request.listing_id,
+            passengers=quote_request.passengers,
+            departure_date=quote_request.departure_date,
+            return_date=quote_request.return_date,
+            trip_type=quote_request.trip_type
+        )
+        
+        # Create quote record
+        quote_id = str(uuid.uuid4())
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=int(os.environ.get('QUOTE_TTL_HOURS', 24)))
+        hosted_url = f"https://charter.example.com/quote/{quote_id}"  # TODO: Configure proper domain
+        
+        quote_insert = """
+        INSERT INTO quotes (id, listing_id, customer_email, customer_phone, passengers, 
+                          departure_date, return_date, trip_type, base_price, surcharges, 
+                          taxes, service_fee, total_price, currency, expires_at, hosted_url, created_at)
+        VALUES (:id, :listing_id, :customer_email, :customer_phone, :passengers,
+                :departure_date, :return_date, :trip_type, :base_price, :surcharges,
+                :taxes, :service_fee, :total_price, :currency, :expires_at, :hosted_url, :created_at)
+        """
+        
+        await database.execute(quote_insert, {
+            "id": quote_id,
+            "listing_id": quote_request.listing_id,
+            "customer_email": quote_request.customer_email,
+            "customer_phone": quote_request.customer_phone,
+            "passengers": quote_request.passengers,
+            "departure_date": quote_request.departure_date,
+            "return_date": quote_request.return_date,
+            "trip_type": quote_request.trip_type,
+            "base_price": pricing_result['base_price'],
+            "surcharges": pricing_result['surcharges'],
+            "taxes": pricing_result['taxes'],
+            "service_fee": pricing_result['service_fee'],
+            "total_price": pricing_result['total_price'],
+            "currency": pricing_result['currency'],
+            "expires_at": expires_at,
+            "hosted_url": hosted_url,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return QuoteResponse(
+            id=quote_id,
+            base_price=pricing_result['base_price'],
+            surcharges=pricing_result['surcharges'],
+            taxes=pricing_result['taxes'],
+            service_fee=pricing_result['service_fee'],
+            total_price=pricing_result['total_price'],
+            currency=pricing_result['currency'],
+            expires_at=expires_at,
+            hosted_url=hosted_url
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating quote: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/quotes/{quote_id}")
+async def get_quote(quote_id: str):
+    """Get quote details"""
+    quote_query = """
+    SELECT q.*, l.title as listing_title, 
+           o_orig.code as origin_code, o_dest.code as destination_code,
+           a.name as aircraft_name, a.type as aircraft_type
+    FROM quotes q
+    JOIN listings l ON q.listing_id = l.id
+    LEFT JOIN routes r ON l.route_id = r.id
+    LEFT JOIN airports o_orig ON r.origin_id = o_orig.id
+    LEFT JOIN airports o_dest ON r.destination_id = o_dest.id
+    LEFT JOIN aircraft a ON l.aircraft_id = a.id
+    WHERE q.id = :quote_id
+    """
+    
+    quote = await database.fetch_one(quote_query, {"quote_id": quote_id})
+    
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    return dict(quote)
+
+# Availability Management
+
+@api_router.post("/ops/slots")
+async def create_availability_slot(slot_data: dict):
+    """Create availability slot for aircraft"""
+    try:
+        aircraft_id = slot_data.get('aircraft_id')
+        start_datetime = datetime.fromisoformat(slot_data.get('start_datetime'))
+        end_datetime = datetime.fromisoformat(slot_data.get('end_datetime'))
+        slot_type = slot_data.get('slot_type', 'AVAILABLE')
+        notes = slot_data.get('notes')
+        
+        if not aircraft_id or not start_datetime or not end_datetime:
+            raise ValueError("Aircraft ID, start datetime, and end datetime are required")
+        
+        if start_datetime >= end_datetime:
+            raise ValueError("Start datetime must be before end datetime")
+        
+        # Check for overlapping slots
+        overlap_query = """
+        SELECT id FROM availability_slots 
+        WHERE aircraft_id = :aircraft_id 
+        AND (
+            (start_datetime <= :start_datetime AND end_datetime > :start_datetime) OR
+            (start_datetime < :end_datetime AND end_datetime >= :end_datetime) OR
+            (start_datetime >= :start_datetime AND end_datetime <= :end_datetime)
+        )
+        """
+        
+        overlapping = await database.fetch_one(overlap_query, {
+            "aircraft_id": aircraft_id,
+            "start_datetime": start_datetime,
+            "end_datetime": end_datetime
+        })
+        
+        if overlapping:
+            raise ValueError("Slot overlaps with existing availability slot")
+        
+        # Create slot
+        slot_id = str(uuid.uuid4())
+        slot_insert = """
+        INSERT INTO availability_slots (id, aircraft_id, start_datetime, end_datetime, slot_type, notes, created_at)
+        VALUES (:id, :aircraft_id, :start_datetime, :end_datetime, :slot_type, :notes, :created_at)
+        """
+        
+        await database.execute(slot_insert, {
+            "id": slot_id,
+            "aircraft_id": aircraft_id,
+            "start_datetime": start_datetime,
+            "end_datetime": end_datetime,
+            "slot_type": slot_type,
+            "notes": notes,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return {"id": slot_id, "message": "Availability slot created successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error creating availability slot: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/availability")
+async def get_availability(aircraft_id: str, date_range: str):
+    """
+    Get availability for aircraft in date range
+    Format: date_range=YYYY-MM-DD/YYYY-MM-DD
+    Returns: Available slots minus busy blocks, holds, and bookings
+    """
+    try:
+        # Parse date range
+        start_date_str, end_date_str = date_range.split('/')
+        start_date = datetime.fromisoformat(start_date_str + "T00:00:00Z").replace(tzinfo=timezone.utc)
+        end_date = datetime.fromisoformat(end_date_str + "T23:59:59Z").replace(tzinfo=timezone.utc)
+        
+        # Get availability slots
+        slots_query = """
+        SELECT * FROM availability_slots 
+        WHERE aircraft_id = :aircraft_id 
+        AND start_datetime <= :end_date AND end_datetime >= :start_date
+        AND slot_type = 'AVAILABLE'
+        ORDER BY start_datetime
+        """
+        
+        slots = await database.fetch_all(slots_query, {
+            "aircraft_id": aircraft_id,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        
+        # Get busy blocks
+        busy_query = """
+        SELECT * FROM busy_blocks 
+        WHERE aircraft_id = :aircraft_id 
+        AND start_datetime <= :end_date AND end_datetime >= :start_date
+        ORDER BY start_datetime
+        """
+        
+        busy_blocks = await database.fetch_all(busy_query, {
+            "aircraft_id": aircraft_id,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        
+        # Get active holds from Redis
+        hold_keys = await redis_client.keys(f"hold:*:{aircraft_id}:*")
+        active_holds = []
+        
+        for key in hold_keys:
+            hold_data = await redis_client.get(key)
+            if hold_data:
+                hold_info = json.loads(hold_data)
+                hold_start = datetime.fromisoformat(hold_info['start_datetime'])
+                hold_end = datetime.fromisoformat(hold_info['end_datetime'])
+                
+                if hold_start <= end_date and hold_end >= start_date:
+                    active_holds.append({
+                        'start_datetime': hold_info['start_datetime'],
+                        'end_datetime': hold_info['end_datetime'],
+                        'hold_id': hold_info['hold_id']
+                    })
+        
+        # Get confirmed bookings
+        booking_query = """
+        SELECT h.start_datetime, h.end_datetime FROM bookings b
+        JOIN holds h ON b.hold_id = h.id
+        WHERE h.aircraft_id = :aircraft_id AND b.status IN ('CONFIRMED', 'PAID')
+        AND h.start_datetime <= :end_date AND h.end_datetime >= :start_date
+        ORDER BY h.start_datetime
+        """
+        
+        bookings = await database.fetch_all(booking_query, {
+            "aircraft_id": aircraft_id,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        
+        return {
+            "aircraft_id": aircraft_id,
+            "date_range": date_range,
+            "available_slots": [dict(slot) for slot in slots],
+            "busy_blocks": [dict(block) for block in busy_blocks],
+            "active_holds": active_holds,
+            "confirmed_bookings": [dict(booking) for booking in bookings],
+            "summary": {
+                "total_slots": len(slots),
+                "busy_blocks": len(busy_blocks),
+                "active_holds": len(active_holds),
+                "confirmed_bookings": len(bookings)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting availability: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Hold Management
+
+@api_router.post("/holds")
+async def create_hold(hold_data: dict):
+    """Create a hold on aircraft availability"""
+    try:
+        aircraft_id = hold_data.get('aircraft_id')
+        quote_id = hold_data.get('quote_id')
+        start_datetime = datetime.fromisoformat(hold_data.get('start_datetime'))
+        end_datetime = datetime.fromisoformat(hold_data.get('end_datetime'))
+        
+        if not aircraft_id or not start_datetime or not end_datetime:
+            raise ValueError("Aircraft ID, start datetime, and end datetime are required")
+        
+        # Generate hold ID and Redis key
+        hold_id = str(uuid.uuid4())
+        redis_key = f"hold:{hold_id}:{aircraft_id}:{int(start_datetime.timestamp())}"
+        
+        # Hold TTL in minutes
+        ttl_minutes = int(os.environ.get('HOLD_TTL_MINUTES', 15))
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+        
+        # Check for conflicts (atomic operation using Redis SETNX)
+        conflict_keys = await redis_client.keys(f"hold:*:{aircraft_id}:*")
+        
+        for key in conflict_keys:
+            existing_hold = await redis_client.get(key)
+            if existing_hold:
+                existing_data = json.loads(existing_hold)
+                existing_start = datetime.fromisoformat(existing_data['start_datetime'])
+                existing_end = datetime.fromisoformat(existing_data['end_datetime'])
+                
+                # Check for time conflict
+                if (start_datetime < existing_end and end_datetime > existing_start):
+                    raise HTTPException(status_code=409, detail="Time slot is already held")
+        
+        # Create hold in Redis with TTL
+        hold_data_json = {
+            "hold_id": hold_id,
+            "aircraft_id": aircraft_id,
+            "quote_id": quote_id,
+            "start_datetime": start_datetime.isoformat(),
+            "end_datetime": end_datetime.isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Use SETNX for atomic operation
+        success = await redis_client.set(redis_key, json.dumps(hold_data_json), nx=True, ex=ttl_minutes * 60)
+        
+        if not success:
+            raise HTTPException(status_code=409, detail="Could not acquire hold - slot may be taken")
+        
+        # Create hold record in database
+        hold_insert = """
+        INSERT INTO holds (id, aircraft_id, quote_id, start_datetime, end_datetime, redis_key, expires_at, created_at)
+        VALUES (:id, :aircraft_id, :quote_id, :start_datetime, :end_datetime, :redis_key, :expires_at, :created_at)
+        """
+        
+        await database.execute(hold_insert, {
+            "id": hold_id,
+            "aircraft_id": aircraft_id,
+            "quote_id": quote_id,
+            "start_datetime": start_datetime,
+            "end_datetime": end_datetime,
+            "redis_key": redis_key,
+            "expires_at": expires_at,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return {
+            "hold_id": hold_id,
+            "expires_at": expires_at.isoformat(),
+            "ttl_minutes": ttl_minutes,
+            "message": "Hold created successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating hold: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/holds/{hold_id}")
+async def release_hold(hold_id: str):
+    """Release a hold"""
+    try:
+        # Get hold from database
+        hold_query = "SELECT redis_key, status FROM holds WHERE id = :hold_id"
+        hold = await database.fetch_one(hold_query, {"hold_id": hold_id})
+        
+        if not hold:
+            raise HTTPException(status_code=404, detail="Hold not found")
+        
+        if hold['status'] != 'ACTIVE':
+            raise HTTPException(status_code=400, detail="Hold is not active")
+        
+        # Remove from Redis
+        await redis_client.delete(hold['redis_key'])
+        
+        # Update hold status
+        hold_update = "UPDATE holds SET status = 'RELEASED', updated_at = :updated_at WHERE id = :hold_id"
+        await database.execute(hold_update, {
+            "hold_id": hold_id,
+            "updated_at": datetime.now(timezone.utc)
+        })
+        
+        return {"message": "Hold released successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error releasing hold: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/holds/{hold_id}")
+async def get_hold_status(hold_id: str):
+    """Get hold status"""
+    hold_query = "SELECT * FROM holds WHERE id = :hold_id"
+    hold = await database.fetch_one(hold_query, {"hold_id": hold_id})
+    
+    if not hold:
+        raise HTTPException(status_code=404, detail="Hold not found")
+    
+    # Check if still active in Redis
+    redis_status = await redis_client.get(hold['redis_key'])
+    is_active_in_redis = redis_status is not None
+    
+    hold_dict = dict(hold)
+    hold_dict['active_in_redis'] = is_active_in_redis
+    
+    return hold_dict
+
 # Include the router
 app.include_router(api_router)
 
