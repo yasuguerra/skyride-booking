@@ -350,12 +350,14 @@ async def create_wompi_payment_link(booking: Booking, amount: float) -> Optional
         return None
 
 def verify_wompi_webhook(payload: bytes, signature: str) -> bool:
-    """Verify Wompi webhook signature"""
-    if os.getenv('DRY_RUN', 'true').lower() == 'true':
-        return True
+    """Verify Wompi webhook signature - PRODUCTION VERSION"""
+    
+    if PAYMENTS_DRY_RUN:
+        return True  # Skip verification only in staging
         
     secret = os.getenv('WOMPI_WEBHOOK_SECRET')
     if not secret:
+        logger.error("WOMPI_WEBHOOK_SECRET not configured")
         return False
         
     expected_signature = hmac.new(
