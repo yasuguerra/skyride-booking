@@ -73,7 +73,21 @@ async def run_async_migrations():
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
+    # Use simple sync engine for migration generation
+    from sqlalchemy import create_engine
+    
+    connectable = create_engine(config.get_main_option("sqlalchemy.url"))
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, 
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
