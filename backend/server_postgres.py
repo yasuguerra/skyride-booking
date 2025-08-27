@@ -747,6 +747,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         "status": "ok",
         "database": db_status,
         "database_type": "PostgreSQL",
+        "postgresql_migration": "complete",
         "features": {
             "empty_legs": os.getenv('EMPTY_LEGS_ENABLED', 'false').lower() == 'true',
             "yappy": os.getenv('YAPPY_ENABLED', 'false').lower() == 'true'
