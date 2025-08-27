@@ -369,11 +369,8 @@ def verify_wompi_webhook(payload: bytes, signature: str) -> bool:
     return hmac.compare_digest(signature, expected_signature)
 
 async def send_whatsapp_template(template: WhatsAppTemplate) -> bool:
-    """Send WhatsApp template via Chatrace"""
-    if os.getenv('DRY_RUN', 'true').lower() == 'true':
-        logger.info(f"DRY_RUN: Would send WhatsApp template {template.template} to {template.to}")
-        return True
-        
+    """Send WhatsApp template via Chatrace - PRODUCTION VERSION"""
+    
     try:
         chatrace_url = f"{os.getenv('CHATRACE_API_URL')}/messages/template"
         headers = {
@@ -390,9 +387,15 @@ async def send_whatsapp_template(template: WhatsAppTemplate) -> bool:
         if template.deepLink:
             payload["parameters"]["link"] = template.deepLink
             
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(chatrace_url, headers=headers, json=payload)
-            return response.status_code == 200
+            
+            if response.status_code == 200:
+                logger.info(f"✅ WhatsApp template {template.template} sent to {template.to}")
+                return True
+            else:
+                logger.error(f"Chatrace error: {response.status_code} - {response.text}")
+                return False
             
     except Exception as e:
         logger.error(f"Failed to send WhatsApp template: {e}")
