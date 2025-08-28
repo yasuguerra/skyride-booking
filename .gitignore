@@ -1,5 +1,11 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+
 # IDE and editors
 .idea/
 .vscode/
@@ -18,6 +24,7 @@ node_modules/
 
 # Testing
 /coverage
+**/.pytest_cache/
 
 # Next.js
 /.next/
@@ -28,6 +35,13 @@ next-env.d.ts
 # Production builds
 /build
 dist/
+
+# Database files
+*.db
+backend/*.db
+
+# Python cache
+**/__pycache__/
 dist
 
 # Environment files (comprehensive coverage)

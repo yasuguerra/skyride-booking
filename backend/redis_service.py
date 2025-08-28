@@ -155,6 +155,31 @@ class RedisService:
         lock_key = f"lock:{resource}"
         return await self.exists(lock_key)
         
+    # Idempotency operations
+    async def store_idempotency_key(self, idempotency_key: str, result_data: Any, ttl_seconds: int = 86400) -> bool:
+        """
+        Store idempotency key with result data (24h TTL by default)
+        Returns True if stored successfully
+        """
+        key = f"idemp:{idempotency_key}"
+        try:
+            return await self.set_json(key, result_data, expire=ttl_seconds)
+        except Exception as e:
+            logger.error(f"Error storing idempotency key {idempotency_key}: {e}")
+            return False
+    
+    async def get_idempotency_result(self, idempotency_key: str) -> Optional[Any]:
+        """
+        Get result for idempotency key
+        Returns stored result or None if not found/expired
+        """
+        key = f"idemp:{idempotency_key}"
+        try:
+            return await self.get_json(key)
+        except Exception as e:
+            logger.error(f"Error getting idempotency key {idempotency_key}: {e}")
+            return None
+    
     # Hold-specific operations
     async def create_hold_lock(self, listing_id: str, hold_duration_minutes: int = 1440) -> bool:
         """
@@ -223,6 +248,30 @@ class RedisService:
         hold_key = f"hold:{listing_id}"
         return await self.exists(hold_key)
         
+    async def release_expired_holds(self) -> int:
+        """
+        Release expired holds that are past TTL
+        Returns number of holds released
+        """
+        try:
+            pattern = "hold:*"
+            keys = await self.redis_client.keys(pattern)
+            released_count = 0
+            
+            for key in keys:
+                ttl = await self.ttl(key)
+                if ttl <= 0:  # Expired or no TTL
+                    await self.delete(key)
+                    released_count += 1
+                    
+            if released_count > 0:
+                logger.info(f"🧹 Released {released_count} expired holds")
+                
+            return released_count
+        except Exception as e:
+            logger.error(f"Error releasing expired holds: {e}")
+            return 0
+        
     # Cache operations
     async def cache_availability(self, aircraft_id: str, date_range: str, availability_data: List[Dict]) -> bool:
         """Cache availability data for aircraft"""
@@ -258,6 +307,35 @@ class RedisService:
 
 # Global Redis service instance
 redis_service = RedisService()
+
+# Convenience functions for use across the application
+async def get_hold_info(aircraft_id: str, start_time: datetime, end_time: datetime) -> Optional[Dict[str, Any]]:
+    """
+    Get hold information that affects a specific aircraft and time range.
+    This is a convenience function for availability queries.
+    """
+    # Note: This is a simplified implementation
+    # In a full system, you'd check holds by aircraft and time overlap
+    # For now, we check if any hold exists for the aircraft in general
+    hold_key_pattern = f"hold:*{aircraft_id}*"
+    try:
+        redis_client = redis_service.redis_client
+        if not redis_client:
+            await redis_service.connect()
+            redis_client = redis_service.redis_client
+            
+        keys = await redis_client.keys(hold_key_pattern)
+        for key in keys:
+            hold_data = await redis_service.get_json(key)
+            if hold_data:
+                # Add TTL information
+                ttl = await redis_service.ttl(key)
+                hold_data['remaining_seconds'] = ttl
+                return hold_data
+        return None
+    except Exception as e:
+        logger.error(f"Error getting hold info for aircraft {aircraft_id}: {e}")
+        return None
 
 # FastAPI dependency
 async def get_redis():

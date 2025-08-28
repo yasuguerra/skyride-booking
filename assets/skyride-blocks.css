@@ -1,0 +1,375 @@
+/* 
+ * SkyRide WordPress Blocks Styles
+ * Official brand colors and design tokens implementation
+ * Brand Manual Compliant - Colors: Primary #152c46, Accent #4670b5
+ * Typography: Open Sans (web-safe fallbacks included)
+ */
+
+/* Import Open Sans for WordPress blocks */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Sky Ride Brand Tokens for WordPress */
+:root {
+  --sr-color-primary: #152c46;
+  --sr-color-accent: #4670b5; 
+  --sr-color-black: #000000;
+  --sr-color-primary-light: rgba(21, 44, 70, 0.1);
+  --sr-color-accent-light: rgba(70, 112, 181, 0.1);
+  --sr-radius: 16px;
+  --sr-shadow: 0 8px 24px rgba(21, 44, 70, 0.15);
+  --sr-font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Quote CTA Block */
+.skyride-quote-cta {
+    margin: 20px 0;
+    text-align: center;
+    font-family: var(--sr-font-family);
+}
+
+.skyride-cta-button {
+    display: inline-block;
+    padding: 15px 30px;
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--sr-font-family);
+    text-decoration: none;
+    border-radius: var(--sr-radius);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: none;
+    box-shadow: var(--sr-shadow);
+}
+
+.skyride-cta-primary {
+    background: var(--sr-color-primary);
+    color: white;
+}
+
+.skyride-cta-primary:hover {
+    background: var(--sr-color-accent);
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.skyride-cta-secondary {
+    background: white;
+    color: var(--sr-color-primary);
+    border: 2px solid var(--sr-color-primary);
+}
+
+.skyride-cta-secondary:hover {
+    background: var(--sr-color-primary);
+    color: white;
+    text-decoration: none;
+}
+
+/* Quote Embed */
+.skyride-quote-embed {
+    margin: 20px 0;
+    border-radius: var(--sr-radius);
+    overflow: hidden;
+    box-shadow: var(--sr-shadow);
+}
+
+/* Hot Deals Block */
+.skyride-hot-deals {
+    margin: 30px 0;
+    padding: 20px;
+    background: var(--sr-color-primary-light);
+    border-radius: var(--sr-radius);
+    font-family: var(--sr-font-family);
+}
+
+.skyride-deals-title {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-primary);
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Grid Layout */
+.skyride-layout-grid .skyride-deals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+/* List Layout */
+.skyride-layout-list .skyride-deals-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.skyride-layout-list .skyride-deal-card {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+}
+
+.skyride-layout-list .skyride-deal-image {
+    flex-shrink: 0;
+    width: 120px;
+    height: 80px;
+    margin-right: 20px;
+}
+
+.skyride-layout-list .skyride-deal-content {
+    flex-grow: 1;
+}
+
+.skyride-layout-list .skyride-deal-footer {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+/* Deal Card with Sky Ride branding */
+.skyride-deal-card {
+    background: white;
+    border-radius: var(--sr-radius);
+    overflow: hidden;
+    box-shadow: var(--sr-shadow);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    border: 2px solid var(--sr-color-accent-light);
+}
+
+/* Hot Deals Card with Empty Leg band */
+.skyride-deal-card.sr-hot-deals-card::before {
+    content: 'HOT DEAL';
+    position: absolute;
+    top: 12px;
+    right: -30px;
+    background: var(--sr-color-accent);
+    color: white;
+    padding: 4px 40px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--sr-font-family);
+    transform: rotate(45deg);
+    z-index: 10;
+}
+
+.skyride-deal-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(21, 44, 70, 0.2);
+}
+
+/* Deal Content */
+.skyride-deal-content {
+    padding: 20px;
+    font-family: var(--sr-font-family);
+}
+
+.skyride-deal-title {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-primary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.skyride-deal-route {
+    font-size: 16px;
+    color: var(--sr-color-accent);
+    font-weight: 500;
+    font-family: var(--sr-font-family);
+    margin-bottom: 8px;
+}
+
+.skyride-deal-operator,
+.skyride-deal-passengers {
+    font-size: 14px;
+    color: #64748b;
+    font-family: var(--sr-font-family);
+    margin-bottom: 4px;
+}
+
+/* Deal Footer */
+.skyride-deal-footer {
+    padding: 0 20px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.skyride-deal-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.skyride-price-amount {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: var(--sr-font-family);
+    color: var(--sr-color-accent);
+}
+
+.skyride-price-currency {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+    font-family: var(--sr-font-family);
+}
+
+.skyride-deal-button {
+    background: var(--sr-color-primary);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--sr-font-family);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.skyride-deal-button:hover {
+    background: var(--sr-color-accent);
+    transform: translateY(-1px);
+    color: white;
+    text-decoration: none;
+}
+
+/* Deal Badges */
+.skyride-deal-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 4px;
+    z-index: 2;
+}
+
+.skyride-badge-featured {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: white;
+}
+
+.skyride-badge-boosted {
+    background: linear-gradient(135deg, #ec4899, #be185d);
+    color: white;
+}
+
+/* Empty State */
+.skyride-hot-deals-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 2px dashed #cbd5e1;
+}
+
+.skyride-hot-deals-empty p {
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .skyride-layout-grid .skyride-deals-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .skyride-layout-list .skyride-deal-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .skyride-layout-list .skyride-deal-image {
+        width: 100%;
+        height: 150px;
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+    
+    .skyride-layout-list .skyride-deal-footer {
+        justify-content: center;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .skyride-cta-button {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+    
+    .skyride-deals-title {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .skyride-hot-deals {
+        margin: 20px 0;
+        padding: 15px;
+    }
+    
+    .skyride-deal-content {
+        padding: 15px;
+    }
+    
+    .skyride-deal-footer {
+        padding: 0 15px 15px;
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+}
+
+/* Animation for page load */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.skyride-hot-deals,
+.skyride-quote-cta {
+    animation: slideInUp 0.6s ease-out;
+}
+
+/* WordPress Editor Styles */
+.wp-block-skyride-quote-cta,
+.wp-block-skyride-hot-deals {
+    margin: 20px 0;
+}
+
+/* Focus states for accessibility */
+.skyride-cta-button:focus,
+.skyride-deal-button:focus,
+.skyride-deal-card:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+    .skyride-deal-button,
+    .skyride-cta-button {
+        background: #333 !important;
+        color: white !important;
+        box-shadow: none !important;
+    }
+    
+    .skyride-deal-card {
+        break-inside: avoid;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    }
+}
