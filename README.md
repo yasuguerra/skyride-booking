@@ -1,67 +1,163 @@
-# SkyRide Charter Booking Platform 🚁
+# SkyRide Booking Platform v2.0
 
-A comprehensive charter flight booking platform with marketplace functionality, hosted quotes, and integrated payment processing.
-
-## 🎯 MVP Features Complete
-
-### ✅ Core Booking Flow
-- **Marketplace Listings** - Browse available charter flights with transparent pricing
-- **Hosted Quotes** - Unique tokenized quotes with expiration timers (`/q/{token}`)
-- **Hold System** - 24-hour booking holds with optional deposits
-- **Payment Processing** - Wompi Banistmo integration with webhook support
-- **Price Parity** - Transparent Base Price + Service Fee breakdown
-
-### ✅ Platform Features
-- **Sky Ride Protection** - Weather delays, aircraft substitution, 24/7 support
-- **Price Match Guarantee** - Beat any legitimate quote by 5%
-- **Admin Dashboard** - Operator portal with listings and booking management
-- **WhatsApp Integration** - Chatrace templates and webhook processing
-- **n8n Hooks** - API endpoints for external automation workflows
-
-### ✅ Technical Architecture
-- **Frontend**: React 19 + Tailwind CSS + Shadcn/UI components
-- **Backend**: FastAPI + Motor (MongoDB async driver)
-- **Database**: MongoDB with UUID-based models
-- **Payments**: Wompi Banistmo (primary) + Yappy (feature flagged)
-- **Messaging**: Chatrace WhatsApp API integration
-- **Security**: CORS, CSP headers, webhook signature verification
+**Production-ready charter flight booking system for Panama.**
 
 ## 🚀 Quick Start
 
-### Test the Platform
+### Local Development
 ```bash
-# Health check
-curl https://flightdb-shift.preview.emergentagent.com/api/health
+# Backend
+cd backend
+cp .env.example .env
+pip install -r requirements.txt
+alembic upgrade head
+python start_server.py
 
-# Test listings
-curl https://flightdb-shift.preview.emergentagent.com/api/listings
+# Frontend  
+cd frontend
+npm install
+npm start
 ```
 
-## 📊 Sample Data Included
+### Production (Supabase)
+```bash
+# Set environment variables
+export DATABASE_URL="postgresql://postgres.xxx:password@aws-0-us-west-1.pooler.supabase.com:6543/postgres?sslmode=require"
+export DATABASE_URL_MIGRATIONS="postgresql://postgres.xxx:password@aws-0-us-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
 
-The platform comes with seeded sample data:
+# Run migrations
+cd backend && alembic upgrade head
 
-- **2 Operators**: Panama Elite Aviation, Sky Charter Panama
-- **3 Aircraft**: Bell 407, Bell 206, Airbus AS350  
-- **4 Routes**: Panama City → San Carlos, Bocas del Toro, David, Colon
-- **4 Charter Listings**: Various pricing from $2,940 - $8,820
+# Start services
+docker-compose up -d
+```
 
-## 🔗 Key URLs
+## 🏗️ Architecture
 
-- **Homepage**: `/` - Flight search and listings
-- **Hosted Quote**: `/q/{token}` - Individual quote pages with timers
-- **Checkout**: `/checkout/{orderId}` - Payment processing
-- **Admin Dashboard**: `/admin` or `/ops` - Operator portal
-- **Success Page**: `/success` - Post-payment confirmation
+### Stack
+- **Database**: PostgreSQL (Supabase) with SSL
+- **Cache**: Redis for holds and rate limiting
+- **Backend**: FastAPI + SQLAlchemy (asyncio)
+- **Frontend**: React + shadcn/ui
 
-## 🏆 Success Criteria Met
+### Key Features
+- ✅ **Real-time availability** with slot management
+- ✅ **Idempotent payments** with Wompi webhooks (HMAC-SHA256)
+- ✅ **Rate limiting** (5 req/min on quotes/holds)
+- ✅ **WhatsApp messaging** via Chatrace templates
+- ✅ **ICS calendar import** for aircraft availability
+- ✅ **Embeddable widget** for WordPress/external sites
+- ✅ **Health monitoring** with comprehensive checks
 
-✅ **Quote Creation**: Under 60 seconds with guaranteed pricing
-✅ **Payment Processing**: Wompi integration with webhook automation  
-✅ **Hold System**: 24-hour holds with countdown timers
-✅ **Price Transparency**: Clear base + service fee breakdown
-✅ **Protection Features**: Sky Ride Protection included
-✅ **Admin Tools**: Operator dashboard for management
-✅ **Integration Ready**: WhatsApp, n8n, WordPress compatibility
+## 📡 API Endpoints
 
-The platform is production-ready and meets all MVP requirements for the SkyRide charter booking marketplace.
+### Core Booking
+```
+GET    /api/health                     # System health check
+GET    /api/availability               # Query available slots  
+POST   /api/quotes                     # Generate flight quotes (rate limited)
+GET    /api/quotes/{token}             # Retrieve quote details
+POST   /api/holds                      # Create booking holds (rate limited)
+POST   /api/bookings                   # Confirm bookings
+```
+
+### Operations
+```
+POST   /api/ops/slots/upsert           # Manage availability slots
+POST   /api/ops/ics/sync               # Sync ICS calendar
+```
+
+### Integrations
+```
+POST   /api/webhooks/wompi             # Wompi payment webhooks
+POST   /api/wa/send-template           # WhatsApp templates
+```
+
+## 🛡️ Security & Reliability
+
+### Payment Security
+- **Wompi webhook verification**: HMAC-SHA256 signature validation
+- **Idempotency protection**: Prevents duplicate payment processing
+- **Audit logging**: All transactions logged with WebhookEvent
+
+### Rate Limiting
+- **POST /api/quotes**: 5 requests per minute per IP
+- **POST /api/holds**: 5 requests per minute per IP
+- **Redis sliding window**: Automatic cleanup and reset
+
+### Availability Protection
+- **Redis-based holds**: Prevent double-booking during checkout
+- **Slot validation**: Overlap detection and conflict resolution
+- **Multi-source slots**: Portal, ICS calendar, Google Calendar
+
+## 🌍 Deployment
+
+### Environment Variables
+```bash
+# Database
+DATABASE_URL=postgresql://...supabase.com:6543/postgres?sslmode=require
+DATABASE_URL_MIGRATIONS=postgresql://...supabase.com:5432/postgres?sslmode=require
+
+# Cache
+REDIS_URL=redis://localhost:6379/0
+
+# Payments
+WOMPI_PUBLIC_KEY=pub_xxx
+WOMPI_PRIVATE_KEY=prv_xxx
+WOMPI_WEBHOOK_SECRET=xxx
+
+# WhatsApp
+CHATRACE_TOKEN=xxx
+WHATSAPP_ENABLED=true
+```
+
+### Health Check Response
+```json
+{
+  "status": "ok",
+  "version": "2.0.0", 
+  "database_type": "PostgreSQL/Supabase",
+  "db": true,
+  "redis": true
+}
+```
+
+## 📊 Monitoring
+
+### Operations Reports
+```bash
+# Generate health report
+python scripts/gen_report.py
+
+# Database backup
+./scripts/pg_backup.sh
+
+# ICS calendar sync
+python scripts/sync_ics_all.py
+```
+
+### CI/CD Pipeline
+- **Backend**: ruff linting + pytest
+- **Frontend**: build validation
+- **Redis services**: Health checks included
+
+## 📚 Documentation
+
+- [**Availability System**](docs/README_AVAILABILITY.md) - Slot management and holds
+- [**Import System**](docs/README_IMPORTS.md) - ICS calendar import (v1)
+- [**Pricing Engine**](docs/README_PRICING.md) - Dynamic pricing calculations
+- [**Widget System**](docs/README_WIDGET.md) - Embeddable booking widget
+- [**Go-Live Guide**](docs/GO_LIVE.md) - Production deployment checklist
+
+## 🇵🇦 Panama Configuration
+
+**Timezone**: America/Panama  
+**Currency**: USD  
+**Primary Routes**: PTY ↔ BLB, DAV, CHX  
+**WhatsApp Format**: +507XXXXXXXX
+
+---
+
+**Version**: v2.0.0 (PostgreSQL/Supabase)  
+**Branch**: release/v2.0-postgres  
+**Status**: Production Ready ✅

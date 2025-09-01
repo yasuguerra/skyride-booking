@@ -15,18 +15,31 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Database Configuration
-DATABASE_URL = os.getenv(
+# Database Configuration - Supabase with SSL support
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv(
     'POSTGRES_URL', 
-    'sqlite+aiosqlite:///./skyride_postgres.db'  # SQLite for demo
+    'sqlite+aiosqlite:///./skyride_postgres.db'  # SQLite for local dev only
 )
+
+# SSL configuration for Supabase
+connect_args = {}
+if "supabase.com" in DATABASE_URL or "sslmode=require" in DATABASE_URL:
+    if DATABASE_URL.startswith("postgresql://"):
+        connect_args = {
+            "server_settings": {
+                "application_name": "skyride_v2"
+            }
+        }
 
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
     pool_size=20,
-    max_overflow=30
+    max_overflow=30,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=3600
 )
 
 # Create async session factory
@@ -40,12 +53,15 @@ async_session_factory = async_sessionmaker(
 Base = declarative_base()
 
 # Dependency for FastAPI
-async def get_db():
+async def get_session():
     async with async_session_factory() as session:
         try:
             yield session
         finally:
             await session.close()
+
+# Alias for compatibility
+get_db = get_session
 
 # Initialize database
 async def init_db():

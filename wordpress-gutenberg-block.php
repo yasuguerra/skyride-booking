@@ -66,23 +66,41 @@ class SkyRideGutenbergBlocks {
     }
     
     public function enqueue_scripts() {
-        // Enqueue block scripts and styles
+        // Enqueue the SkyRide frontend loader (v2.0)
+        wp_enqueue_script(
+            'skyride-frontend',
+            plugins_url('assets/skyride-frontend.js', __FILE__),
+            [],
+            '2.0.0',
+            true
+        );
+        
+        // Enqueue CSS from assets directory
+        wp_enqueue_style(
+            'skyride-blocks',
+            plugins_url('assets/skyride-blocks.css', __FILE__),
+            [],
+            '2.0.0'
+        );
+        
+        // Pass configuration to frontend (v2.0)
+        wp_localize_script('skyride-frontend', 'skyRideConfig', [
+            'apiUrl' => 'https://booking.skyride.city/api',
+            'widgetUrl' => 'https://booking.skyride.city/widget.js',
+            'version' => '2.0.0',
+            'ga4_measurement_id' => get_option('skyride_ga4_id', ''),
+            'cross_domain' => true
+        ]);
+        
+        // Legacy support for existing blocks
         wp_enqueue_script(
             'skyride-block-frontend',
             plugins_url('assets/skyride-frontend.js', __FILE__),
             ['jquery'],
-            '1.0.0',
+            '2.0.0',
             true
         );
         
-        wp_enqueue_style(
-            'skyride-block',
-            plugins_url('assets/skyride-blocks.css', __FILE__),
-            [],
-            '1.0.0'
-        );
-        
-        // Add SkyRide configuration
         wp_localize_script('skyride-block-frontend', 'skyride_config', [
             'api_base' => 'https://booking.skyride.city/api',
             'booking_base' => 'https://booking.skyride.city',

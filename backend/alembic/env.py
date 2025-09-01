@@ -13,7 +13,9 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from models_postgres import Base
-from database_postgres import DATABASE_URL
+
+# Database URL priority: DATABASE_URL_MIGRATIONS > DATABASE_URL > fallback SQLite
+MIGRATIONS_URL = os.getenv("DATABASE_URL_MIGRATIONS") or os.getenv("DATABASE_URL") or "sqlite:///./skyride_temp.db"
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -63,7 +65,7 @@ async def run_async_migrations():
     """In this scenario we need to create an Engine and associate a connection with the context."""
     from sqlalchemy.ext.asyncio import create_async_engine
     
-    connectable = create_async_engine(DATABASE_URL, future=True)
+    connectable = create_async_engine(MIGRATIONS_URL, future=True)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
@@ -76,7 +78,12 @@ def run_migrations_online() -> None:
     # Use simple sync engine for migration generation
     from sqlalchemy import create_engine
     
-    connectable = create_engine(config.get_main_option("sqlalchemy.url"))
+    # Convert async URL to sync for Alembic compatibility
+    sync_url = MIGRATIONS_URL.replace("postgresql://", "postgresql+psycopg2://").replace("+asyncpg", "")
+    
+    # Override config URL with our migrations URL
+    config.set_main_option("sqlalchemy.url", sync_url)
+    connectable = create_engine(sync_url)
 
     with connectable.connect() as connection:
         context.configure(

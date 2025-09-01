@@ -33,6 +33,7 @@ from models_postgres import (
     BookingStatus, PaymentProvider, PaymentStatus
 )
 from redis_service import get_redis, RedisService
+from ratelimit import rate_limit
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -294,7 +295,8 @@ async def get_listings(
     return response_data
 
 @api_router.post("/quotes")
-async def create_quote(quote_data: QuoteCreate, db: AsyncSession = Depends(get_db)):
+@rate_limit(limit=5, window=60)  # 5 requests per minute
+async def create_quote(request: Request, quote_data: QuoteCreate, db: AsyncSession = Depends(get_db)):
     """Create a new quote - PostgreSQL version"""
     
     # Get listing
@@ -429,7 +431,9 @@ async def get_quote(token: str, db: AsyncSession = Depends(get_db)):
     }
 
 @api_router.post("/holds")
+@rate_limit(limit=5, window=60)  # 5 requests per minute
 async def create_hold(
+    request: Request,
     hold_data: HoldCreate, 
     db: AsyncSession = Depends(get_db),
     redis: RedisService = Depends(get_redis)
@@ -542,62 +546,156 @@ async def create_checkout(checkout_data: CheckoutCreate, db: AsyncSession = Depe
 # Webhook Endpoints
 @api_router.post("/webhooks/wompi")
 async def wompi_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    """Handle Wompi webhooks - PRODUCTION VERSION"""
+    """Handle Wompi webhooks with robust verification and idempotency."""
     
     payload = await request.body()
     signature = request.headers.get("x-wompi-signature", "")
     
+    # Robust HMAC verification (not in DRY_RUN mode in prod)
     if not verify_wompi_webhook(payload, signature):
-        logger.warning("Invalid Wompi webhook signature")
+        logger.warning(f"Invalid Wompi webhook signature: {signature[:20]}...")
         raise HTTPException(status_code=401, detail="Invalid signature")
     
     try:
         data = json.loads(payload.decode('utf-8'))
-        event = data.get("event")
+        event_type = data.get("event")
         transaction = data.get("data", {})
+        external_event_id = transaction.get("id")
+        
+        if not event_type or not external_event_id:
+            logger.warning(f"Invalid webhook payload: missing event or transaction ID")
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        
+        # Check for duplicate event (idempotency protection)
+        existing_event = await db.execute(
+            select(WebhookEvent).where(
+                and_(
+                    WebhookEvent.external_event_id == external_event_id,
+                    WebhookEvent.event_type == event_type
+                )
+            )
+        )
+        existing = existing_event.scalar_one_or_none()
+        
+        if existing:
+            if existing.processed:
+                logger.info(f"Webhook event {external_event_id} already processed successfully")
+                return {"status": "ok", "message": "Event already processed"}
+            else:
+                logger.info(f"Webhook event {external_event_id} exists but not processed, retrying...")
+        else:
+            # Create new webhook event record
+            webhook_event = WebhookEvent(
+                event_type=event_type,
+                external_event_id=external_event_id,
+                payload=data,
+                signature=signature,
+                external_created_at=datetime.fromtimestamp(transaction.get("created_at", 0)) if transaction.get("created_at") else None
+            )
+            db.add(webhook_event)
+            await db.flush()  # Get the ID
+            existing = webhook_event
         
         # Find payment by metadata
         metadata = transaction.get("metadata", {})
         booking_id = metadata.get("booking_id")
         
-        if booking_id:
-            booking_result = await db.execute(select(Booking).where(Booking.id == booking_id))
-            booking = booking_result.scalar_one_or_none()
+        if not booking_id:
+            logger.warning(f"No booking_id in webhook metadata: {metadata}")
+            existing.processing_error = "No booking_id in metadata"
+            existing.retry_count += 1
+            await db.commit()
+            return {"status": "ok", "message": "No booking_id found"}
+        
+        # Get booking and payment
+        booking_result = await db.execute(select(Booking).where(Booking.id == booking_id))
+        booking = booking_result.scalar_one_or_none()
+        
+        if not booking:
+            logger.error(f"Booking {booking_id} not found for webhook event {external_event_id}")
+            existing.processing_error = f"Booking {booking_id} not found"
+            existing.retry_count += 1
+            await db.commit()
+            return {"status": "ok", "message": "Booking not found"}
+        
+        payment_result = await db.execute(select(Payment).where(Payment.booking_id == booking_id))
+        payment = payment_result.scalar_one_or_none()
+        
+        if not payment:
+            logger.error(f"Payment for booking {booking_id} not found")
+            existing.processing_error = f"Payment for booking {booking_id} not found"
+            existing.retry_count += 1
+            await db.commit()
+            return {"status": "ok", "message": "Payment not found"}
+        
+        # Process payment state change
+        if event_type == "payment.paid":
+            # Update payment
+            payment.status = PaymentStatus.PAID
+            payment.paid_at = datetime.now(timezone.utc)
+            payment.external_id = external_event_id
+            payment.webhook_payload = data
             
-            payment_result = await db.execute(select(Payment).where(Payment.booking_id == booking_id))
-            payment = payment_result.scalar_one_or_none()
+            # Update booking
+            booking.status = BookingStatus.PAID
+            booking.fully_paid_at = datetime.now(timezone.utc)
+            booking.paid_amount = booking.total_amount
             
-            if booking and payment:
-                if event == "payment.paid":
-                    # Update payment
-                    payment.status = PaymentStatus.PAID
-                    payment.paid_at = datetime.now(timezone.utc)
-                    payment.external_id = transaction.get("id")
-                    payment.webhook_payload = data
-                    
-                    # Update booking
-                    booking.status = BookingStatus.PAID
-                    booking.fully_paid_at = datetime.now(timezone.utc)
-                    booking.paid_amount = booking.total_amount
-                    
-                    await db.commit()
-                    
-                    logger.info(f"✅ Payment confirmed for booking {booking.booking_number}")
-                    
-                elif event == "payment.failed":
-                    payment.status = PaymentStatus.FAILED
-                    payment.failed_at = datetime.now(timezone.utc)
-                    payment.failure_reason = transaction.get("failure_reason")
-                    payment.webhook_payload = data
-                    
-                    await db.commit()
-                    
-                    logger.info(f"❌ Payment failed for booking {booking.booking_number}")
+            # Mark webhook as processed
+            existing.processed = True
+            existing.processed_at = datetime.now(timezone.utc)
+            existing.payment_id = payment.id
+            
+            await db.commit()
+            
+            logger.info(f"✅ Payment confirmed for booking {booking.booking_number}")
+            
+        elif event_type == "payment.failed":
+            payment.status = PaymentStatus.FAILED
+            payment.failed_at = datetime.now(timezone.utc)
+            payment.failure_reason = transaction.get("failure_reason", "Unknown failure")
+            payment.webhook_payload = data
+            
+            # Mark webhook as processed
+            existing.processed = True
+            existing.processed_at = datetime.now(timezone.utc)
+            existing.payment_id = payment.id
+            
+            await db.commit()
+            
+            logger.info(f"❌ Payment failed for booking {booking.booking_number}: {payment.failure_reason}")
+            
+        elif event_type == "payment.pending":
+            payment.status = PaymentStatus.PROCESSING
+            payment.webhook_payload = data
+            
+            # Mark webhook as processed
+            existing.processed = True
+            existing.processed_at = datetime.now(timezone.utc)
+            existing.payment_id = payment.id
+            
+            await db.commit()
+            
+            logger.info(f"⏰ Payment pending for booking {booking.booking_number}")
+            
+        else:
+            logger.warning(f"Unhandled webhook event type: {event_type}")
+            existing.processing_error = f"Unhandled event type: {event_type}"
+            existing.retry_count += 1
+            await db.commit()
     
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in webhook payload: {e}")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
     except Exception as e:
         logger.error(f"Webhook processing error: {e}")
+        if 'existing' in locals():
+            existing.processing_error = str(e)
+            existing.retry_count += 1
+            await db.commit()
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
         
-    return {"status": "ok"}
+    return {"status": "ok", "message": "Event processed successfully"}
 
 @api_router.post("/webhooks/yappy")
 async def yappy_webhook():
@@ -734,30 +832,41 @@ async def n8n_notify(notify_data: N8NNotifyRequest, db: AsyncSession = Depends(g
 # Health Check
 @api_router.get("/health")
 async def health_check(db: AsyncSession = Depends(get_db)):
-    """Health check endpoint - PostgreSQL version"""
+    """Health check endpoint with DB and Redis status"""
     
-    try:
-        # Test database connection
-        await db.execute(select(1))
-        db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {e}"
-    
-    return {
+    health_status = {
         "status": "ok",
-        "database": db_status,
-        "database_type": "PostgreSQL",
-        "postgresql_migration": "complete",
-        "features": {
-            "empty_legs": os.getenv('EMPTY_LEGS_ENABLED', 'false').lower() == 'true',
-            "yappy": os.getenv('YAPPY_ENABLED', 'false').lower() == 'true'
-        },
-        "payments_dry_run": os.getenv('PAYMENTS_DRY_RUN', 'false').lower() == 'true',
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "database_type": "PostgreSQL/Supabase"
     }
+    
+    # Test database connection
+    try:
+        await db.execute(select(1))
+        health_status["db"] = True
+    except Exception as e:
+        health_status["db"] = False
+        health_status["db_error"] = str(e)
+    
+    # Test Redis connection
+    try:
+        redis = await get_redis()
+        await redis.ping()
+        health_status["redis"] = True
+        await redis.close()
+    except Exception as e:
+        health_status["redis"] = False
+        health_status["redis_error"] = str(e)
+    
+    return health_status
 
-# Include router
+# Include routers
+from api.routes.wa import router as wa_router
+from api.routes.ops_slots import router as ops_router
+
 app.include_router(api_router)
+app.include_router(wa_router)
+app.include_router(ops_router)
 
 # CORS
 app.add_middleware(
